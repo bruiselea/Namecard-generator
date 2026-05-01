@@ -6,6 +6,7 @@
 <title>名刺ジェネレーター</title>
 <script src="https://cdn.jsdelivr.net/npm/opentype.js@1.3.4/dist/opentype.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/earcut@2.2.4/src/earcut.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: system-ui, sans-serif; background: #1a1a1a; color: #e0e0e0; height: 100vh; display: flex; flex-direction: column; }
@@ -72,6 +73,17 @@
     padding: 2px;
   }
   .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .template-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .template-btn {
+    background: #2a2a2a;
+    border: 1px solid #444;
+    color: #ddd;
+    padding: 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .template-btn:hover { border-color: #666; background: #333; }
 
   /* フォントドロップゾーン */
   .font-drop {
@@ -128,7 +140,10 @@
     background: #1e1e1e;
     flex-shrink: 0;
   }
-  .properties h2 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #888; margin-bottom: 10px; }
+  .properties-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .properties h2 { flex: 1; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #888; }
+  .properties-close { background: none; border: none; color: #777; cursor: pointer; font-size: 16px; line-height: 1; padding: 0 2px; }
+  .properties-close:hover { color: #eee; }
   .properties.hidden { display: none; }
 
   .canvas-area {
@@ -178,6 +193,15 @@
 
 <div class="main">
   <div class="panel">
+    <!-- テンプレート -->
+    <div class="panel-section">
+      <h2>テンプレート</h2>
+      <div class="template-grid">
+        <button class="template-btn" onclick="applyTemplate('business')">ビジネス</button>
+        <button class="template-btn" onclick="applyTemplate('qr-logo')">ロゴ + QR</button>
+      </div>
+    </div>
+
     <!-- フォント -->
     <div class="panel-section">
       <h2>フォント</h2>
@@ -214,19 +238,23 @@
       <h2>要素</h2>
       <div id="element-list-container"></div>
       <button class="add-btn" onclick="addElement()">＋ テキストを追加</button>
+      <button class="add-btn" onclick="addQRElement()">＋ QRを追加</button>
     </div>
 
     <!-- 選択要素プロパティ -->
     <div class="properties hidden" id="properties-panel">
-      <h2>プロパティ</h2>
-      <label>テキスト</label>
+      <div class="properties-header">
+        <h2>プロパティ</h2>
+        <button class="properties-close" onclick="closeProperties()" title="閉じる">×</button>
+      </div>
+      <label id="prop-text-label">テキスト</label>
       <input type="text" id="prop-text" oninput="updateSelectedProp('text', this.value)">
-      <label>サイズ (pt)</label>
+      <label id="prop-size-label">サイズ (pt)</label>
       <input type="number" id="prop-size" value="12" min="4" max="120" oninput="updateSelectedProp('size', +this.value)">
-      <label>スタイル</label>
+      <label id="prop-bold-label">スタイル</label>
       <select id="prop-bold" onchange="updateSelectedProp('bold', this.value === 'true')">
-        <option value="false">標準</option>
         <option value="true">太字</option>
+        <option value="false">標準</option>
       </select>
       <label>色</label>
       <input type="color" id="prop-color" oninput="updateSelectedProp('color', this.value)">
@@ -250,7 +278,8 @@
 // ============================================================
 // 状態
 // ============================================================
-const SCALE = 3;
+const PREVIEW_SCALE = 8; // CSS px / mm
+let renderScale = PREVIEW_SCALE;
 let cardW = 91, cardH = 55;
 let selectedId = null;
 let dragState = null;
@@ -269,8 +298,8 @@ function applyViewTransform() {
 
 function centerView() {
   const aw = canvasArea.clientWidth, ah = canvasArea.clientHeight;
-  viewPanX = (aw - canvas.width  * viewZoom) / 2;
-  viewPanY = (ah - canvas.height * viewZoom) / 2;
+  viewPanX = (aw - cardW * PREVIEW_SCALE * viewZoom) / 2;
+  viewPanY = (ah - cardH * PREVIEW_SCALE * viewZoom) / 2;
   applyViewTransform();
 }
 
@@ -278,17 +307,17 @@ function centerView() {
 function clientToMM(clientX, clientY) {
   const rect = canvas.getBoundingClientRect();
   return {
-    x: (clientX - rect.left) / (SCALE * viewZoom),
-    y: (clientY - rect.top)  / (SCALE * viewZoom),
+    x: (clientX - rect.left) / (PREVIEW_SCALE * viewZoom),
+    y: (clientY - rect.top)  / (PREVIEW_SCALE * viewZoom),
   };
 }
 
 let elements = [
-  { id: uid(), text: '山田 太郎',           x: 8, y: 14, size: 18, bold: true,  color: '#111111', extrude: 0.5 },
-  { id: uid(), text: 'Taro Yamada',         x: 8, y: 21, size: 9,  bold: false, color: '#444444', extrude: 0.4 },
-  { id: uid(), text: '株式会社サンプル',     x: 8, y: 31, size: 9,  bold: false, color: '#2563eb', extrude: 0.4 },
-  { id: uid(), text: '090-0000-0000',       x: 8, y: 43, size: 7,  bold: false, color: '#555555', extrude: 0.3 },
-  { id: uid(), text: 'sample@example.com', x: 8, y: 50, size: 7,  bold: false, color: '#555555', extrude: 0.3 },
+  { id: uid(), type: 'text', text: '山田 太郎',           x: 8, y: 14, size: 18, bold: true, color: '#111111', extrude: 0.5 },
+  { id: uid(), type: 'text', text: 'Taro Yamada',         x: 8, y: 21, size: 9,  bold: true, color: '#444444', extrude: 0.4 },
+  { id: uid(), type: 'text', text: '株式会社サンプル',     x: 8, y: 31, size: 9,  bold: true, color: '#2563eb', extrude: 0.4 },
+  { id: uid(), type: 'text', text: '090-0000-0000',       x: 8, y: 43, size: 7,  bold: true, color: '#555555', extrude: 0.3 },
+  { id: uid(), type: 'text', text: 'sample@example.com', x: 8, y: 50, size: 7,  bold: true, color: '#555555', extrude: 0.3 },
 ];
 
 function uid() { return Math.random().toString(36).slice(2); }
@@ -343,6 +372,30 @@ function onCardSizeChange() {
   }
 }
 
+function applyTemplate(name) {
+  selectedId = null;
+  document.getElementById('properties-panel').classList.add('hidden');
+  document.getElementById('base-color').value = '#ffffff';
+
+  if (name === 'qr-logo') {
+    elements = [
+      { id: uid(), type: 'text', text: 'LOGO', x: 8, y: 25, size: 22, bold: true, color: '#111111', extrude: 0.6 },
+      { id: uid(), type: 'qr', text: 'https://example.com', x: 56, y: 11, size: 33, bold: true, color: '#111111', extrude: 0.5 },
+    ];
+  } else {
+    elements = [
+      { id: uid(), type: 'text', text: '山田 太郎',           x: 8, y: 14, size: 18, bold: true, color: '#111111', extrude: 0.5 },
+      { id: uid(), type: 'text', text: 'Taro Yamada',         x: 8, y: 21, size: 9,  bold: true, color: '#444444', extrude: 0.4 },
+      { id: uid(), type: 'text', text: '株式会社サンプル',     x: 8, y: 31, size: 9,  bold: true, color: '#2563eb', extrude: 0.4 },
+      { id: uid(), type: 'text', text: '090-0000-0000',       x: 8, y: 43, size: 7,  bold: true, color: '#555555', extrude: 0.3 },
+      { id: uid(), type: 'text', text: 'sample@example.com', x: 8, y: 50, size: 7,  bold: true, color: '#555555', extrude: 0.3 },
+    ];
+  }
+
+  renderElementList();
+  renderCanvas(true);
+}
+
 // ============================================================
 // 描画
 // ============================================================
@@ -352,34 +405,433 @@ const ctx = canvas.getContext('2d');
 function renderCanvas(recenter = false) {
   cardW = +document.getElementById('card-w').value || 91;
   cardH = +document.getElementById('card-h').value || 55;
+  const cssW = cardW * PREVIEW_SCALE;
+  const cssH = cardH * PREVIEW_SCALE;
+  const dpr = Math.max(1, window.devicePixelRatio || 1);
+  renderScale = PREVIEW_SCALE * dpr;
+
+  const pixelW = Math.round(cssW * dpr);
+  const pixelH = Math.round(cssH * dpr);
   const prevW = canvas.width, prevH = canvas.height;
-  canvas.width  = cardW * SCALE;
-  canvas.height = cardH * SCALE;
-  if (recenter || prevW !== canvas.width || prevH !== canvas.height) centerView();
+  canvas.width = pixelW;
+  canvas.height = pixelH;
+  canvas.style.width = `${cssW}px`;
+  canvas.style.height = `${cssH}px`;
+  if (recenter || prevW !== pixelW || prevH !== pixelH) centerView();
 
   ctx.fillStyle = document.getElementById('base-color').value;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   for (const el of elements) {
-    const px = el.size * SCALE * 0.353;
-    ctx.font = `${el.bold ? 'bold ' : ''}${px}px system-ui, sans-serif`;
-    ctx.fillStyle = el.color;
-    ctx.fillText(el.text, el.x * SCALE, el.y * SCALE);
+    if (el.type === 'qr') {
+      drawQRElement(ctx, el, renderScale);
+    } else if (el.type === 'image') {
+      drawImageElement(ctx, el, renderScale);
+    } else {
+      const px = el.size * renderScale * 0.353;
+      ctx.font = `${el.bold ? 'bold ' : ''}${px}px system-ui, sans-serif`;
+      ctx.fillStyle = el.color;
+      ctx.fillText(el.text, el.x * renderScale, el.y * renderScale);
+    }
   }
 
   if (selectedId) {
     const el = elements.find(e => e.id === selectedId);
     if (el) {
-      const px = el.size * SCALE * 0.353;
-      ctx.font = `${el.bold ? 'bold ' : ''}${px}px system-ui, sans-serif`;
-      const w = ctx.measureText(el.text).width;
       ctx.strokeStyle = '#2563eb';
-      ctx.lineWidth = 1.5;
-      ctx.setLineDash([4, 3]);
-      ctx.strokeRect(el.x * SCALE - 2, el.y * SCALE - px - 1, w + 4, px + 5);
+      ctx.lineWidth = 1.5 * dpr;
+      ctx.setLineDash([4 * dpr, 3 * dpr]);
+      if (el.type === 'qr' || el.type === 'image') {
+        const h = getElementHeight(el);
+        ctx.strokeRect(el.x * renderScale - 2 * dpr, el.y * renderScale - 2 * dpr, el.size * renderScale + 4 * dpr, h * renderScale + 4 * dpr);
+      } else {
+        const px = el.size * renderScale * 0.353;
+        ctx.font = `${el.bold ? 'bold ' : ''}${px}px system-ui, sans-serif`;
+        const w = ctx.measureText(el.text).width;
+        ctx.strokeRect(el.x * renderScale - 2 * dpr, el.y * renderScale - px - 1 * dpr, w + 4 * dpr, px + 5 * dpr);
+      }
       ctx.setLineDash([]);
     }
   }
+}
+
+function drawQRElement(targetCtx, el, scale) {
+  const matrix = getQRMatrix(el.text);
+  const count = matrix.length;
+  if (!count) return;
+  const module = el.size * scale / count;
+  targetCtx.fillStyle = el.color;
+  for (let y = 0; y < count; y++) {
+    for (let x = 0; x < count; x++) {
+      if (matrix[y][x]) targetCtx.fillRect(el.x * scale + x * module, el.y * scale + y * module, Math.ceil(module), Math.ceil(module));
+    }
+  }
+}
+
+function drawImageElement(targetCtx, el, scale) {
+  if (!el.pixels || !el.gridW || !el.gridH) return;
+  const cell = el.size * scale / el.gridW;
+  for (const p of el.pixels) {
+    targetCtx.fillStyle = p.color;
+    targetCtx.fillRect(el.x * scale + p.x * cell, el.y * scale + p.y * cell, Math.ceil(cell), Math.ceil(cell));
+  }
+}
+
+function getQRMatrix(text) {
+  if (window.qrcode) {
+    const qr = qrcode(0, 'M');
+    qr.addData(text || ' ');
+    qr.make();
+    const count = qr.getModuleCount();
+    return Array.from({ length: count }, (_, y) =>
+      Array.from({ length: count }, (_, x) => qr.isDark(y, x))
+    );
+  }
+
+  const count = 29;
+  return Array.from({ length: count }, (_, y) =>
+    Array.from({ length: count }, (_, x) => {
+      const finder = (fx, fy) => x >= fx && x < fx + 7 && y >= fy && y < fy + 7 &&
+        (x === fx || x === fx + 6 || y === fy || y === fy + 6 || (x >= fx + 2 && x <= fx + 4 && y >= fy + 2 && y <= fy + 4));
+      if (finder(0, 0) || finder(count - 7, 0) || finder(0, count - 7)) return true;
+      let h = 0;
+      for (const ch of String(text || '')) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+      return ((x * 17 + y * 23 + h) % 7) < 3;
+    })
+  );
+}
+
+function getElementHeight(el) {
+  if (el.type === 'image' && el.gridW && el.gridH) return el.size * el.gridH / el.gridW;
+  return el.size;
+}
+
+async function svgFileToLogoElement(file) {
+  const svgText = await file.text();
+  const parsed = parseSvgLogo(svgText);
+  const pixels = [];
+  for (const color of parsed.colors) {
+    pixels.push(...await rasterizeSvgColorLayer(parsed.doc, parsed.viewBox, color, parsed.gridW, parsed.gridH));
+  }
+  const vectorGroups = extractSvgVectorGroups(parsed.doc, parsed.viewBox);
+  return {
+    id: uid(),
+    type: 'image',
+    text: file.name.replace(/\.[^.]+$/, '') || 'logo',
+    x: 8,
+    y: 10,
+    size: 32,
+    gridW: parsed.gridW,
+    gridH: parsed.gridH,
+    pixels,
+    vectorGroups,
+    viewBox: parsed.viewBox,
+    bold: true,
+    color: pixels[0]?.color || '#111111',
+    extrude: 0.5,
+  };
+}
+
+function parseSvgLogo(svgText) {
+  const doc = new DOMParser().parseFromString(svgText, 'image/svg+xml');
+  const root = doc.documentElement;
+  if (!root || root.nodeName.toLowerCase() === 'parsererror') throw new Error('SVGとして解析できませんでした');
+  if (!root.getAttribute('xmlns')) root.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+
+  const viewBox = getSvgViewBox(root);
+  const targetCells = 180;
+  const scale = targetCells / Math.max(viewBox.w, viewBox.h);
+  const gridW = Math.max(1, Math.round(viewBox.w * scale));
+  const gridH = Math.max(1, Math.round(viewBox.h * scale));
+  const colors = collectSvgColors(root);
+  if (colors.length === 0) colors.push('#111111');
+  return { doc, viewBox, gridW, gridH, colors: colors.slice(0, 8) };
+}
+
+function getSvgViewBox(root) {
+  const vb = (root.getAttribute('viewBox') || '').trim().split(/[\s,]+/).map(Number);
+  if (vb.length === 4 && vb.every(Number.isFinite) && vb[2] > 0 && vb[3] > 0) {
+    return { x: vb[0], y: vb[1], w: vb[2], h: vb[3] };
+  }
+  const w = parseSvgLength(root.getAttribute('width')) || 100;
+  const h = parseSvgLength(root.getAttribute('height')) || 100;
+  root.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  return { x: 0, y: 0, w, h };
+}
+
+function parseSvgLength(value) {
+  const n = parseFloat(String(value || '').replace(/[a-z%]+$/i, ''));
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+function collectSvgColors(root) {
+  const counts = new Map();
+  for (const el of svgPaintElements(root)) {
+    for (const prop of ['fill', 'stroke']) {
+      const color = normalizeSvgColor(getInheritedSvgPaint(el, prop));
+      if (!color) continue;
+      counts.set(color, (counts.get(color) || 0) + 1);
+    }
+  }
+  return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([color]) => color);
+}
+
+function svgPaintElements(root) {
+  return [...root.querySelectorAll('path,rect,circle,ellipse,polygon,polyline,line')];
+}
+
+function getInheritedSvgPaint(el, prop) {
+  for (let node = el; node && node.nodeType === 1; node = node.parentNode) {
+    const stylePaint = getStylePaint(node.getAttribute('style'), prop);
+    if (stylePaint) return stylePaint;
+    const attrPaint = node.getAttribute(prop);
+    if (attrPaint) return attrPaint;
+  }
+  return prop === 'fill' ? '#000000' : 'none';
+}
+
+function getStylePaint(style, prop) {
+  const m = String(style || '').match(new RegExp(`${prop}\\s*:\\s*([^;]+)`, 'i'));
+  return m ? m[1].trim() : '';
+}
+
+function normalizeSvgColor(value) {
+  const raw = String(value || '').trim();
+  if (!raw || raw === 'none' || raw === 'transparent' || raw === 'currentColor' || raw.startsWith('url(')) return '';
+  const c = document.createElement('canvas').getContext('2d');
+  c.fillStyle = '#000000';
+  c.fillStyle = raw;
+  const normalized = c.fillStyle;
+  if (/^#[0-9a-f]{6}$/i.test(normalized)) return normalized.toUpperCase();
+  const m = normalized.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+  if (!m) return '';
+  return '#' + [m[1], m[2], m[3]].map(n => Number(n).toString(16).padStart(2, '0')).join('').toUpperCase();
+}
+
+async function rasterizeSvgColorLayer(doc, viewBox, color, gridW, gridH) {
+  const clone = doc.documentElement.cloneNode(true);
+  clone.setAttribute('viewBox', `${viewBox.x} ${viewBox.y} ${viewBox.w} ${viewBox.h}`);
+  clone.setAttribute('width', String(gridW));
+  clone.setAttribute('height', String(gridH));
+
+  for (const el of svgPaintElements(clone)) {
+    const fill = normalizeSvgColor(getInheritedSvgPaint(el, 'fill'));
+    const stroke = normalizeSvgColor(getInheritedSvgPaint(el, 'stroke'));
+    const nextFill = fill === color ? color : 'none';
+    const nextStroke = stroke === color ? color : 'none';
+    el.setAttribute('fill', nextFill);
+    el.setAttribute('stroke', nextStroke);
+    el.setAttribute('style', `${el.getAttribute('style') || ''};fill:${nextFill};stroke:${nextStroke};`);
+  }
+
+  const svg = new XMLSerializer().serializeToString(clone);
+  const img = await loadSvgImage(svg);
+  const tmp = document.createElement('canvas');
+  tmp.width = gridW; tmp.height = gridH;
+  const tc = tmp.getContext('2d');
+  tc.drawImage(img, 0, 0, gridW, gridH);
+  const data = tc.getImageData(0, 0, gridW, gridH).data;
+  const pixels = [];
+  for (let y = 0; y < gridH; y++) {
+    for (let x = 0; x < gridW; x++) {
+      if (data[(y * gridW + x) * 4 + 3] > 96) pixels.push({ x, y, color });
+    }
+  }
+  return pixels;
+}
+
+function loadSvgImage(svg) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+    const img = new Image();
+    img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('SVGを画像化できませんでした')); };
+    img.src = url;
+  });
+}
+
+function extractSvgVectorGroups(doc, viewBox) {
+  const byColor = new Map();
+  for (const el of svgPaintElements(doc.documentElement)) {
+    const color = normalizeSvgColor(getInheritedSvgPaint(el, 'fill'));
+    if (!color) continue;
+    const matrix = getCumulativeSvgTransform(el);
+    const contours = svgElementToContours(el).map(contour => contour.map(p => applySvgMatrix(p, matrix)));
+    if (!contours.length) continue;
+    if (!byColor.has(color)) byColor.set(color, []);
+    byColor.get(color).push(...contours);
+  }
+  return [...byColor.entries()].map(([color, contours]) => ({ color, contours, viewBox }));
+}
+
+function svgElementToContours(el) {
+  const tag = el.tagName.toLowerCase();
+  if (tag === 'path') return parseSvgPathContours(el.getAttribute('d') || '');
+  if (tag === 'rect') {
+    const x = parseSvgLength(el.getAttribute('x'));
+    const y = parseSvgLength(el.getAttribute('y'));
+    const w = parseSvgLength(el.getAttribute('width'));
+    const h = parseSvgLength(el.getAttribute('height'));
+    return w > 0 && h > 0 ? [[[x,y],[x+w,y],[x+w,y+h],[x,y+h]]] : [];
+  }
+  if (tag === 'circle' || tag === 'ellipse') {
+    const cx = parseSvgLength(el.getAttribute('cx'));
+    const cy = parseSvgLength(el.getAttribute('cy'));
+    const rx = tag === 'circle' ? parseSvgLength(el.getAttribute('r')) : parseSvgLength(el.getAttribute('rx'));
+    const ry = tag === 'circle' ? rx : parseSvgLength(el.getAttribute('ry'));
+    return rx > 0 && ry > 0 ? [ellipseContour(cx, cy, rx, ry, 48)] : [];
+  }
+  if (tag === 'polygon' || tag === 'polyline') {
+    const pts = parseSvgPoints(el.getAttribute('points') || '');
+    return pts.length >= 3 ? [pts] : [];
+  }
+  if (tag === 'line') {
+    return [];
+  }
+  return [];
+}
+
+function ellipseContour(cx, cy, rx, ry, steps) {
+  const pts = [];
+  for (let i = 0; i < steps; i++) {
+    const a = Math.PI * 2 * i / steps;
+    pts.push([cx + Math.cos(a) * rx, cy + Math.sin(a) * ry]);
+  }
+  return pts;
+}
+
+function parseSvgPoints(points) {
+  const nums = points.trim().split(/[\s,]+/).map(Number).filter(Number.isFinite);
+  const pts = [];
+  for (let i = 0; i + 1 < nums.length; i += 2) pts.push([nums[i], nums[i + 1]]);
+  return pts;
+}
+
+function getCumulativeSvgTransform(el) {
+  let m = [1, 0, 0, 1, 0, 0];
+  const chain = [];
+  for (let node = el; node && node.nodeType === 1; node = node.parentNode) chain.unshift(node);
+  for (const node of chain) m = multiplySvgMatrix(m, parseSvgTransform(node.getAttribute('transform')));
+  return m;
+}
+
+function parseSvgTransform(value) {
+  let m = [1, 0, 0, 1, 0, 0];
+  const re = /(matrix|translate|scale)\(([^)]+)\)/g;
+  let match;
+  while ((match = re.exec(String(value || '')))) {
+    const nums = match[2].trim().split(/[\s,]+/).map(Number).filter(Number.isFinite);
+    let t = [1, 0, 0, 1, 0, 0];
+    if (match[1] === 'matrix' && nums.length >= 6) t = nums.slice(0, 6);
+    if (match[1] === 'translate') t = [1, 0, 0, 1, nums[0] || 0, nums[1] || 0];
+    if (match[1] === 'scale') t = [nums[0] || 1, 0, 0, nums.length > 1 ? nums[1] : nums[0] || 1, 0, 0];
+    m = multiplySvgMatrix(m, t);
+  }
+  return m;
+}
+
+function multiplySvgMatrix(a, b) {
+  return [
+    a[0] * b[0] + a[2] * b[1],
+    a[1] * b[0] + a[3] * b[1],
+    a[0] * b[2] + a[2] * b[3],
+    a[1] * b[2] + a[3] * b[3],
+    a[0] * b[4] + a[2] * b[5] + a[4],
+    a[1] * b[4] + a[3] * b[5] + a[5],
+  ];
+}
+
+function applySvgMatrix(p, m) {
+  return [p[0] * m[0] + p[1] * m[2] + m[4], p[0] * m[1] + p[1] * m[3] + m[5]];
+}
+
+function parseSvgPathContours(d) {
+  const tokens = [...d.matchAll(/[a-zA-Z]|[-+]?(?:\d*\.\d+|\d+)(?:e[-+]?\d+)?/g)].map(m => m[0]);
+  const contours = [];
+  let i = 0, cmd = '', cur = [0, 0], start = [0, 0], contour = null, lastC = null, lastQ = null;
+  const isCmd = t => /^[a-zA-Z]$/.test(t);
+  const num = () => Number(tokens[i++]);
+  const hasNums = () => i < tokens.length && !isCmd(tokens[i]);
+  const add = p => { if (!contour) contour = []; contour.push(p); cur = p; };
+  const close = () => { if (contour && contour.length >= 3) contours.push(contour); contour = null; cur = start; };
+
+  while (i < tokens.length) {
+    if (isCmd(tokens[i])) cmd = tokens[i++];
+    const rel = cmd === cmd.toLowerCase();
+    const C = cmd.toUpperCase();
+    if (C === 'M') {
+      const p = [num(), num()];
+      const q = rel ? [cur[0] + p[0], cur[1] + p[1]] : p;
+      if (contour && contour.length >= 3) contours.push(contour);
+      contour = [q]; cur = q; start = q; lastC = null; lastQ = null;
+      while (hasNums()) {
+        const lp = [num(), num()];
+        add(rel ? [cur[0] + lp[0], cur[1] + lp[1]] : lp);
+      }
+    } else if (C === 'L') {
+      while (hasNums()) {
+        const p = [num(), num()];
+        add(rel ? [cur[0] + p[0], cur[1] + p[1]] : p); lastC = null; lastQ = null;
+      }
+    } else if (C === 'H') {
+      while (hasNums()) {
+        const x = num();
+        add([rel ? cur[0] + x : x, cur[1]]); lastC = null; lastQ = null;
+      }
+    } else if (C === 'V') {
+      while (hasNums()) {
+        const y = num();
+        add([cur[0], rel ? cur[1] + y : y]); lastC = null; lastQ = null;
+      }
+    } else if (C === 'C') {
+      while (hasNums()) {
+        const p1 = [num(), num()], p2 = [num(), num()], p = [num(), num()];
+        const q1 = rel ? [cur[0]+p1[0], cur[1]+p1[1]] : p1;
+        const q2 = rel ? [cur[0]+p2[0], cur[1]+p2[1]] : p2;
+        const q = rel ? [cur[0]+p[0], cur[1]+p[1]] : p;
+        cubicBezier(cur, q1, q2, q, 24).slice(1).forEach(add);
+        lastC = q2; lastQ = null;
+      }
+    } else if (C === 'S') {
+      while (hasNums()) {
+        const p2 = [num(), num()], p = [num(), num()];
+        const q1 = lastC ? [cur[0] * 2 - lastC[0], cur[1] * 2 - lastC[1]] : cur;
+        const q2 = rel ? [cur[0]+p2[0], cur[1]+p2[1]] : p2;
+        const q = rel ? [cur[0]+p[0], cur[1]+p[1]] : p;
+        cubicBezier(cur, q1, q2, q, 24).slice(1).forEach(add);
+        lastC = q2; lastQ = null;
+      }
+    } else if (C === 'Q') {
+      while (hasNums()) {
+        const p1 = [num(), num()], p = [num(), num()];
+        const q1 = rel ? [cur[0]+p1[0], cur[1]+p1[1]] : p1;
+        const q = rel ? [cur[0]+p[0], cur[1]+p[1]] : p;
+        quadBezier(cur, q1, q, 18).slice(1).forEach(add);
+        lastQ = q1; lastC = null;
+      }
+    } else if (C === 'T') {
+      while (hasNums()) {
+        const p = [num(), num()];
+        const q1 = lastQ ? [cur[0] * 2 - lastQ[0], cur[1] * 2 - lastQ[1]] : cur;
+        const q = rel ? [cur[0]+p[0], cur[1]+p[1]] : p;
+        quadBezier(cur, q1, q, 18).slice(1).forEach(add);
+        lastQ = q1; lastC = null;
+      }
+    } else if (C === 'A') {
+      while (hasNums()) {
+        num(); num(); num(); num(); num();
+        const p = [num(), num()];
+        add(rel ? [cur[0] + p[0], cur[1] + p[1]] : p);
+        lastC = null; lastQ = null;
+      }
+    } else if (C === 'Z') {
+      close();
+    } else {
+      while (hasNums()) i++;
+    }
+  }
+  if (contour && contour.length >= 3) contours.push(contour);
+  return contours;
 }
 
 // ============================================================
@@ -391,9 +843,10 @@ function renderElementList() {
   for (const el of elements) {
     const item = document.createElement('div');
     item.className = 'element-item' + (el.id === selectedId ? ' selected' : '');
+    const label = el.type === 'qr' ? `QR: ${el.text}` : el.type === 'image' ? `ロゴ: ${el.text}` : el.text;
     item.innerHTML = `
       <span class="color-dot" style="background:${el.color}"></span>
-      <span class="elabel">${escHtml(el.text)}</span>
+      <span class="elabel">${escHtml(label)}</span>
       <button class="del-btn" data-id="${el.id}">✕</button>
     `;
     item.querySelector('.del-btn').addEventListener('click', e => { e.stopPropagation(); deleteElement(el.id); });
@@ -415,6 +868,12 @@ function selectElement(id) {
   const panel = document.getElementById('properties-panel');
   if (el) {
     panel.classList.remove('hidden');
+    const isQR = el.type === 'qr';
+    const isImage = el.type === 'image';
+    document.getElementById('prop-text-label').textContent = isQR ? 'QR内容' : isImage ? '名前' : 'テキスト';
+    document.getElementById('prop-size-label').textContent = (isQR || isImage) ? 'サイズ (mm)' : 'サイズ (pt)';
+    document.getElementById('prop-bold-label').style.display = (isQR || isImage) ? 'none' : '';
+    document.getElementById('prop-bold').style.display = (isQR || isImage) ? 'none' : '';
     document.getElementById('prop-text').value    = el.text;
     document.getElementById('prop-size').value    = el.size;
     document.getElementById('prop-bold').value    = String(el.bold);
@@ -439,10 +898,42 @@ function updateSelectedProp(key, value) {
   renderCanvas();
 }
 
+function closeProperties() {
+  selectedId = null;
+  document.getElementById('properties-panel').classList.add('hidden');
+  renderElementList();
+  renderCanvas();
+}
+
 function addElement() {
-  const el = { id: uid(), text: '新しいテキスト', x: 10, y: 20, size: 10, bold: false, color: '#000000', extrude: 0.4 };
+  const el = { id: uid(), type: 'text', text: '新しいテキスト', x: 10, y: 20, size: 10, bold: true, color: '#000000', extrude: 0.4 };
   elements.push(el);
   selectElement(el.id);
+}
+
+function addQRElement() {
+  const el = { id: uid(), type: 'qr', text: 'https://example.com', x: 55, y: 12, size: 28, bold: true, color: '#000000', extrude: 0.5 };
+  elements.push(el);
+  selectElement(el.id);
+}
+
+async function onLogoFileInput(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  if (!/\.svg$/i.test(file.name) && file.type !== 'image/svg+xml') {
+    alert('ロゴはSVGファイルを選択してください。');
+    input.value = '';
+    return;
+  }
+  try {
+    const el = await svgFileToLogoElement(file);
+    elements.push(el);
+    input.value = '';
+    selectElement(el.id);
+  } catch(e) {
+    alert('SVGロゴの読み込みに失敗しました: ' + e.message);
+    console.error(e);
+  }
 }
 
 function deleteElement(id) {
@@ -465,11 +956,17 @@ canvas.addEventListener('mousedown', e => {
   let hit = null;
   for (let i = elements.length - 1; i >= 0; i--) {
     const el = elements[i];
-    const px = el.size * SCALE * 0.353;
-    ctx.font = `${el.bold ? 'bold ' : ''}${px}px system-ui, sans-serif`;
-    const w = ctx.measureText(el.text).width / SCALE;
-    const h = el.size * 0.353;
-    if (mx >= el.x - 1 && mx <= el.x + w + 1 && my >= el.y - h - 1 && my <= el.y + 2) {
+    let inside;
+    if (el.type === 'qr' || el.type === 'image') {
+      inside = mx >= el.x - 1 && mx <= el.x + el.size + 1 && my >= el.y - 1 && my <= el.y + getElementHeight(el) + 1;
+    } else {
+      const px = el.size * renderScale * 0.353;
+      ctx.font = `${el.bold ? 'bold ' : ''}${px}px system-ui, sans-serif`;
+      const w = ctx.measureText(el.text).width / renderScale;
+      const h = el.size * 0.353;
+      inside = mx >= el.x - 1 && mx <= el.x + w + 1 && my >= el.y - h - 1 && my <= el.y + 2;
+    }
+    if (inside) {
       hit = el; break;
     }
   }
@@ -564,7 +1061,7 @@ function boxTriangles(x, y, z, w, h, d) {
 // ============================================================
 // ジオメトリ：フォントパス → 押し出しメッシュ
 // ============================================================
-function cubicBezier(p0, p1, p2, p3, steps = 8) {
+function cubicBezier(p0, p1, p2, p3, steps = 24) {
   const pts = [];
   for (let i = 0; i <= steps; i++) {
     const t = i / steps, mt = 1 - t;
@@ -576,7 +1073,7 @@ function cubicBezier(p0, p1, p2, p3, steps = 8) {
   return pts;
 }
 
-function quadBezier(p0, p1, p2, steps = 8) {
+function quadBezier(p0, p1, p2, steps = 18) {
   const pts = [];
   for (let i = 0; i <= steps; i++) {
     const t = i / steps, mt = 1 - t;
@@ -631,6 +1128,39 @@ function signedArea(c) {
   return a / 2;
 }
 
+function contourInteriorPoint(c) {
+  let cx = 0, cy = 0, crossSum = 0;
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (let i = 0, n = c.length; i < n; i++) {
+    const p = c[i], q = c[(i + 1) % n];
+    const cross = p[0] * q[1] - q[0] * p[1];
+    crossSum += cross;
+    cx += (p[0] + q[0]) * cross;
+    cy += (p[1] + q[1]) * cross;
+    minX = Math.min(minX, p[0]); minY = Math.min(minY, p[1]);
+    maxX = Math.max(maxX, p[0]); maxY = Math.max(maxY, p[1]);
+  }
+
+  if (Math.abs(crossSum) > 1e-9) {
+    const p = [cx / (3 * crossSum), cy / (3 * crossSum)];
+    if (pointInPolygon(p[0], p[1], c)) return p;
+  }
+
+  const mid = [(minX + maxX) / 2, (minY + maxY) / 2];
+  if (pointInPolygon(mid[0], mid[1], c)) return mid;
+
+  for (let gy = 1; gy <= 7; gy++) {
+    for (let gx = 1; gx <= 7; gx++) {
+      const p = [minX + (maxX - minX) * gx / 8, minY + (maxY - minY) * gy / 8];
+      if (pointInPolygon(p[0], p[1], c)) return p;
+    }
+  }
+
+  let x = 0, y = 0;
+  for (const p of c) { x += p[0]; y += p[1]; }
+  return [x / c.length, y / c.length];
+}
+
 function pointInPolygon(px, py, poly) {
   let inside = false;
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
@@ -642,31 +1172,44 @@ function pointInPolygon(px, py, poly) {
 }
 
 function organizeContours(contours) {
-  const sorted = contours
+  const items = contours
     .filter(c => c.length >= 3)
-    .map(c => ({ c, area: Math.abs(signedArea(c)) }))
+    .map(c => ({ c, area: Math.abs(signedArea(c)), point: contourInteriorPoint(c) }))
+    .filter(item => item.area > 1e-6)
     .sort((a, b) => b.area - a.area);
 
   const groups = [];
-  const used = new Set();
 
-  for (let i = 0; i < sorted.length; i++) {
-    if (used.has(i)) continue;
-    const outer = sorted[i].c;
-    const holes = [];
-    used.add(i);
-
-    for (let j = i + 1; j < sorted.length; j++) {
-      if (used.has(j)) continue;
-      const inner = sorted[j].c;
-      const cx = inner.reduce((s, p) => s + p[0], 0) / inner.length;
-      const cy = inner.reduce((s, p) => s + p[1], 0) / inner.length;
-      if (pointInPolygon(cx, cy, outer)) {
-        const inHole = holes.some(h => pointInPolygon(cx, cy, h));
-        if (!inHole) { holes.push(inner); used.add(j); }
-      }
+  for (let i = 0; i < items.length; i++) {
+    const [cx, cy] = items[i].point;
+    let depth = 0;
+    for (let j = 0; j < items.length; j++) {
+      if (i !== j && items[j].area > items[i].area && pointInPolygon(cx, cy, items[j].c)) depth++;
     }
-    groups.push({ outer, holes });
+    items[i].depth = depth;
+    items[i].filled = depth % 2 === 0;
+  }
+
+  for (let i = 0; i < items.length; i++) {
+    if (!items[i].filled) continue;
+    const holes = [];
+
+    for (let j = 0; j < items.length; j++) {
+      if (items[j].filled || items[j].area >= items[i].area) continue;
+      const [hx, hy] = items[j].point;
+      if (!pointInPolygon(hx, hy, items[i].c)) continue;
+
+      let nearestFilledParent = null;
+      for (let k = 0; k < items.length; k++) {
+        if (!items[k].filled || items[k].area <= items[j].area || items[k].area >= items[i].area) continue;
+        if (pointInPolygon(hx, hy, items[k].c) && (!nearestFilledParent || items[k].area < nearestFilledParent.area)) {
+          nearestFilledParent = items[k];
+        }
+      }
+      if (!nearestFilledParent) holes.push(items[j].c);
+    }
+
+    groups.push({ outer: items[i].c, holes });
   }
   return groups;
 }
@@ -730,69 +1273,195 @@ function flipY(tris) {
 }
 
 function textToTriangles(el, baseZ) {
+  if (el.type === 'qr') return qrToTriangles(el, baseZ);
+  if (el.type === 'image') return imageToTriangles(el, baseZ);
   if (loadedFont) return textToTrianglesFont(el, baseZ);
   return textToTrianglesCanvas(el, baseZ);
 }
 
+function qrToTriangles(el, baseZ) {
+  const matrix = getQRMatrix(el.text);
+  const count = matrix.length;
+  if (!count) return [];
+  const module = el.size / count;
+  const tris = [];
+  for (let y = 0; y < count; y++) {
+    for (let x = 0; x < count; x++) {
+      if (!matrix[y][x]) continue;
+      tris.push(...boxTriangles(el.x + x * module, el.y + y * module, baseZ, module, module, el.extrude));
+    }
+  }
+  return flipY(tris);
+}
+
+function imageToTriangles(el, baseZ, colorFilter = null) {
+  if (el.vectorGroups && el.vectorGroups.length) {
+    const groups = colorFilter ? el.vectorGroups.filter(g => g.color === colorFilter) : el.vectorGroups;
+    return flipY(groups.flatMap(group => svgVectorGroupToTriangles(el, group, baseZ)));
+  }
+  if (!el.pixels || !el.gridW || !el.gridH) return [];
+  const pix = new Uint8Array(el.gridW * el.gridH);
+  for (const p of el.pixels) {
+    if (colorFilter && p.color !== colorFilter) continue;
+    pix[p.y * el.gridW + p.x] = 1;
+  }
+  const mask = {
+    pix,
+    W: el.gridW,
+    H: el.gridH,
+    ox: el.x,
+    oy: el.y,
+    pxPerMM: el.gridW / el.size,
+  };
+  const tris = rasterMaskToWatertightTriangles(mask, baseZ, el.extrude);
+  return flipY(tris);
+}
+
+function svgVectorGroupToTriangles(el, group, baseZ) {
+  const vb = group.viewBox || el.viewBox;
+  if (!vb || !vb.w || !vb.h) return [];
+  const scale = el.size / vb.w;
+  const contours = group.contours.map(contour =>
+    contour.map(([x, y]) => [
+      el.x + (x - vb.x) * scale,
+      el.y + (y - vb.y) * scale,
+    ])
+  ).filter(c => c.length >= 3 && Math.abs(signedArea(c)) > 0.0001);
+  const groups = organizeContours(contours);
+  return groups.flatMap(({ outer, holes }) => extrudeContourGroup(outer, holes, baseZ, el.extrude));
+}
+
 // opentype.js フォントアウトラインを押し出し
 function textToTrianglesFont(el, baseZ) {
-  const fontSizeMM = el.size * 0.353;
   try {
-    const path = loadedFont.getPath(el.text, el.x, el.y, fontSizeMM);
-    const contours = pathToContours(path.commands);
-    if (contours.length === 0) return textToTrianglesCanvas(el, baseZ);
-    const groups = organizeContours(contours);
-    if (groups.length === 0) return textToTrianglesCanvas(el, baseZ);
-    return flipY(groups.flatMap(({ outer, holes }) => extrudeContourGroup(outer, holes, baseZ, el.extrude)));
+    const mask = makeTextRasterMask(el, true, 24);
+    const tris = rasterMaskToWatertightTriangles(mask, baseZ, el.extrude);
+    if (tris.length === 0) return textToTrianglesCanvas(el, baseZ);
+    return flipY(tris);
   } catch(e) {
-    console.warn('font geometry failed, falling back to canvas:', e);
+    console.warn('font voxel geometry failed, falling back to canvas:', e);
     return textToTrianglesCanvas(el, baseZ);
   }
 }
 
 // canvas ピクセル → ボクセル化（フォントファイル不要・日本語対応）
-// canvas モード：マーチングスクエア法でアウトラインを抽出 → 滑らかな押し出しメッシュ
+// canvas モード：塗られているピクセルから直接 watertight メッシュを作る
 function textToTrianglesCanvas(el, baseZ) {
+  const mask = makeTextRasterMask(el, false, 24);
+  return flipY(rasterMaskToWatertightTriangles(mask, baseZ, el.extrude));
+}
+
+function makeTextRasterMask(el, useLoadedFont = !!loadedFont, pxPerMM = 80) {
   const fontSizeMM = el.size * 0.353;
-  const pxPerMM   = 40; // 高解像度レンダリング
   const fontPx    = fontSizeMM * pxPerMM;
 
   const tmp = document.createElement('canvas');
   const tc  = tmp.getContext('2d');
-  const fontStr = `${el.bold ? 'bold ' : ''}${fontPx}px system-ui, sans-serif`;
-  tc.font = fontStr;
-  const met = tc.measureText(el.text);
+  const padMM = Math.max(0.8, fontSizeMM * 0.2);
+  let ox, oy, W, H;
 
-  const padPx = Math.ceil(fontPx * 0.4);
-  const W = Math.ceil(met.width) + padPx * 2;
-  const H = Math.ceil(fontPx * 1.5) + padPx * 2;
-  tmp.width = W; tmp.height = H;
+  if (useLoadedFont && loadedFont) {
+    const path = loadedFont.getPath(el.text, el.x, el.y, fontSizeMM);
+    const box = path.getBoundingBox();
+    if (![box.x1, box.y1, box.x2, box.y2].every(Number.isFinite)) return emptyRasterMask(pxPerMM);
+    ox = box.x1 - padMM;
+    oy = box.y1 - padMM;
+    W = Math.max(8, Math.ceil((box.x2 - box.x1 + padMM * 2) * pxPerMM));
+    H = Math.max(8, Math.ceil((box.y2 - box.y1 + padMM * 2) * pxPerMM));
+    tmp.width = W; tmp.height = H;
 
-  tc.font = fontStr;
-  tc.fillStyle = 'white';
-  tc.fillText(el.text, padPx, fontPx + padPx * 0.5);
+    tc.setTransform(pxPerMM, 0, 0, pxPerMM, -ox * pxPerMM, -oy * pxPerMM);
+    tc.beginPath();
+    for (const cmd of path.commands) {
+      switch (cmd.type) {
+        case 'M': tc.moveTo(cmd.x, cmd.y); break;
+        case 'L': tc.lineTo(cmd.x, cmd.y); break;
+        case 'C': tc.bezierCurveTo(cmd.x1, cmd.y1, cmd.x2, cmd.y2, cmd.x, cmd.y); break;
+        case 'Q': tc.quadraticCurveTo(cmd.x1, cmd.y1, cmd.x, cmd.y); break;
+        case 'Z': tc.closePath(); break;
+      }
+    }
+    tc.fillStyle = 'white';
+    tc.fill('evenodd');
+  } else {
+    const fontStr = `${el.bold ? 'bold ' : ''}${fontPx}px system-ui, sans-serif`;
+    tc.font = fontStr;
+    const met = tc.measureText(el.text);
+
+    const padPx = Math.ceil(fontPx * 0.4);
+    W = Math.ceil(met.width) + padPx * 2;
+    H = Math.ceil(fontPx * 1.5) + padPx * 2;
+    tmp.width = W; tmp.height = H;
+
+    tc.font = fontStr;
+    tc.fillStyle = 'white';
+    tc.fillText(el.text, padPx, fontPx + padPx * 0.5);
+    ox = el.x - padPx / pxPerMM;
+    oy = el.y - fontPx / pxPerMM - (padPx * 0.5) / pxPerMM;
+  }
 
   const alpha = tc.getImageData(0, 0, W, H).data;
   const pix   = new Uint8Array(W * H);
-  for (let i = 0; i < W * H; i++) pix[i] = alpha[i * 4 + 3] > 100 ? 1 : 0;
+  for (let i = 0; i < W * H; i++) pix[i] = alpha[i * 4 + 3] > 10 ? 1 : 0;
 
+  return { pix, W, H, ox, oy, pxPerMM };
+}
+
+function emptyRasterMask(pxPerMM) {
+  return { pix: new Uint8Array(0), W: 0, H: 0, ox: 0, oy: 0, pxPerMM };
+}
+
+function textToContourGroupsRaster(el, useLoadedFont = !!loadedFont) {
+  const { pix, W, H, ox, oy, pxPerMM } = makeTextRasterMask(el, useLoadedFont, 80);
   // マーチングスクエアでアウトライン輪郭線を抽出
   const pixContours = marchingSquares(pix, W, H);
   if (pixContours.length === 0) return [];
 
   // ピクセル座標 → mm 座標に変換
-  const ox = el.x - padPx / pxPerMM;
-  const oy = el.y - fontPx / pxPerMM - (padPx * 0.5) / pxPerMM;
   const mmContours = pixContours.map(c =>
-    douglasPeucker(c.map(([px, py]) => [ox + px / pxPerMM, oy + py / pxPerMM]), 0.05)
+    douglasPeucker(c.map(([px, py]) => [ox + px / pxPerMM, oy + py / pxPerMM]), 0.03)
   ).filter(c => c.length >= 3 && Math.abs(signedArea(c)) > 0.05);
 
   if (mmContours.length === 0) return [];
+  return organizeContours(mmContours);
+}
 
-  const groups = organizeContours(mmContours);
-  return flipY(groups.flatMap(({ outer, holes }) =>
-    extrudeContourGroup(outer, holes, baseZ, el.extrude)
-  ));
+function rasterMaskToWatertightTriangles(mask, z0, height) {
+  const { pix, W, H, ox, oy, pxPerMM } = mask;
+  const tris = [];
+  const z1 = z0 + height;
+  const on = (x, y) => x >= 0 && x < W && y >= 0 && y < H && pix[y * W + x];
+  const pt = (x, y, z) => [ox + x / pxPerMM, oy + y / pxPerMM, z];
+
+  const addQuad = (a, b, c, d) => {
+    tris.push([a, b, c]);
+    tris.push([a, c, d]);
+  };
+
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      if (!on(x, y)) continue;
+
+      const p00z0 = pt(x,     y,     z0);
+      const p10z0 = pt(x + 1, y,     z0);
+      const p11z0 = pt(x + 1, y + 1, z0);
+      const p01z0 = pt(x,     y + 1, z0);
+      const p00z1 = pt(x,     y,     z1);
+      const p10z1 = pt(x + 1, y,     z1);
+      const p11z1 = pt(x + 1, y + 1, z1);
+      const p01z1 = pt(x,     y + 1, z1);
+
+      addQuad(p00z1, p10z1, p11z1, p01z1); // top
+      addQuad(p11z0, p10z0, p00z0, p01z0); // bottom
+
+      if (!on(x, y - 1)) addQuad(p10z0, p00z0, p00z1, p10z1); // top edge
+      if (!on(x + 1, y)) addQuad(p11z0, p10z0, p10z1, p11z1); // right edge
+      if (!on(x, y + 1)) addQuad(p01z0, p11z0, p11z1, p01z1); // bottom edge
+      if (!on(x - 1, y)) addQuad(p00z0, p01z0, p01z1, p00z1); // left edge
+    }
+  }
+
+  return tris;
 }
 
 // ============================================================
@@ -845,7 +1514,7 @@ function marchingSquares(pix, W, H) {
       for (const [e1, e2] of SEG[idx]) add(ep(e1,x,y), ep(e2,x,y));
     }
 
-  // 閉じた輪郭を辿る
+  // 閉じた輪郭だけを辿る
   const visited  = new Set();
   const contours = [];
 
@@ -858,6 +1527,7 @@ function marchingSquares(pix, W, H) {
     visited.add(startKey);
     let prev = startKey, curr = nbrs[0];
 
+    let closed = false;
     while (curr !== startKey) {
       if (visited.has(curr)) break;
       visited.add(curr);
@@ -865,8 +1535,9 @@ function marchingSquares(pix, W, H) {
       const next = (adj.get(curr) ?? []).find(k => k !== prev);
       if (!next) break;
       prev = curr; curr = next;
+      if (curr === startKey) closed = true;
     }
-    if (contour.length >= 3) contours.push(contour);
+    if (closed && contour.length >= 3) contours.push(contour);
   }
   return contours;
 }
@@ -898,10 +1569,19 @@ function douglasPeucker(pts, eps) {
 function buildExportObjects() {
   const baseT = +(document.getElementById('base-thickness').value) || 0.8;
   const objs = [
-    { tris: boxTriangles(0, 0, 0, cardW, cardH, baseT), color: document.getElementById('base-color').value },
+    { name: 'base', tris: boxTriangles(0, 0, 0, cardW, cardH, baseT), color: document.getElementById('base-color').value },
   ];
   for (const el of elements) {
-    objs.push({ tris: textToTriangles(el, baseT), color: el.color });
+    if (el.type === 'image') {
+      const colors = el.vectorGroups?.length
+        ? [...new Set(el.vectorGroups.map(g => g.color))]
+        : [...new Set((el.pixels || []).map(p => p.color))];
+      for (const color of colors) {
+        objs.push({ name: `${el.text || 'logo'} ${color}`, tris: imageToTriangles(el, baseT, color), color });
+      }
+    } else {
+      objs.push({ name: el.text || 'text', tris: textToTriangles(el, baseT), color: el.color });
+    }
   }
   return objs;
 }
@@ -924,20 +1604,20 @@ function exportSVG() {
 
     for (const el of elements) {
       const fontSize = (el.size * 0.353).toFixed(4);
-      if (loadedFont) {
-        // opentype.js → SVG <path>（完全ベクター・フォント不要）
-        const opPath = loadedFont.getPath(el.text, el.x, el.y, parseFloat(fontSize));
-        const d = opPath.commands.map(cmd => {
-          switch (cmd.type) {
-            case 'M': return `M${f(cmd.x)},${f(cmd.y)}`;
-            case 'L': return `L${f(cmd.x)},${f(cmd.y)}`;
-            case 'C': return `C${f(cmd.x1)},${f(cmd.y1)},${f(cmd.x2)},${f(cmd.y2)},${f(cmd.x)},${f(cmd.y)}`;
-            case 'Q': return `Q${f(cmd.x1)},${f(cmd.y1)},${f(cmd.x)},${f(cmd.y)}`;
-            case 'Z': return 'Z';
-            default:  return '';
-          }
-        }).join('');
-        lines.push(`  <path fill="${el.color}" fill-rule="evenodd" d="${d}"/>`);
+      if (el.type === 'qr') {
+        const d = svgPathDFromQR(el);
+        lines.push(`  <path fill="${el.color}" d="${d}"/>`);
+      } else if (el.type === 'image') {
+        const byColor = groupImagePixelsByColor(el);
+        for (const [color, pixels] of byColor) {
+          const d = svgPathDFromImagePixels(el, pixels);
+          lines.push(`  <path fill="${color}" d="${d}"/>`);
+        }
+      } else if (loadedFont) {
+        // 実際に塗りつぶされた文字マスクから、文字部分だけの閉じたパスを生成
+        const mask = makeTextRasterMask(el, true, 24);
+        const d = svgPathDFromRasterMask(mask);
+        lines.push(`  <path fill="${el.color}" fill-rule="evenodd" clip-rule="evenodd" d="${d}"/>`);
       } else {
         // <text> 要素（システムフォント依存だが完全ベクター）
         const bold = el.bold ? ' font-weight="bold"' : '';
@@ -956,6 +1636,73 @@ function exportSVG() {
 }
 
 function f(n) { return n.toFixed(4); }
+
+function svgPathDFromQR(el) {
+  const matrix = getQRMatrix(el.text);
+  const count = matrix.length;
+  if (!count) return '';
+  const module = el.size / count;
+  const parts = [];
+  for (let y = 0; y < count; y++) {
+    for (let x = 0; x < count; x++) {
+      if (!matrix[y][x]) continue;
+      const x0 = el.x + x * module;
+      const y0 = el.y + y * module;
+      const x1 = x0 + module;
+      const y1 = y0 + module;
+      parts.push(`M${f(x0)},${f(y0)}L${f(x1)},${f(y0)}L${f(x1)},${f(y1)}L${f(x0)},${f(y1)}Z`);
+    }
+  }
+  return parts.join('');
+}
+
+function groupImagePixelsByColor(el) {
+  const map = new Map();
+  for (const p of el.pixels || []) {
+    if (!map.has(p.color)) map.set(p.color, []);
+    map.get(p.color).push(p);
+  }
+  return map;
+}
+
+function svgPathDFromImagePixels(el, pixels) {
+  const cell = el.size / el.gridW;
+  const parts = [];
+  for (const p of pixels) {
+    const x0 = el.x + p.x * cell;
+    const y0 = el.y + p.y * cell;
+    const x1 = x0 + cell;
+    const y1 = y0 + cell;
+    parts.push(`M${f(x0)},${f(y0)}L${f(x1)},${f(y0)}L${f(x1)},${f(y1)}L${f(x0)},${f(y1)}Z`);
+  }
+  return parts.join('');
+}
+
+function svgPathDFromRasterMask(mask) {
+  const { pix, W, H, ox, oy, pxPerMM } = mask;
+  const parts = [];
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      if (!pix[y * W + x]) continue;
+      const x0 = ox + x / pxPerMM;
+      const y0 = oy + y / pxPerMM;
+      const x1 = ox + (x + 1) / pxPerMM;
+      const y1 = oy + (y + 1) / pxPerMM;
+      parts.push(`M${f(x0)},${f(y0)}L${f(x1)},${f(y0)}L${f(x1)},${f(y1)}L${f(x0)},${f(y1)}Z`);
+    }
+  }
+  return parts.join('');
+}
+
+function svgPathDFromContourGroups(groups) {
+  return groups.map(({ outer, holes }) => {
+    return [outer, ...holes].map(contour => {
+      if (!contour.length) return '';
+      const [start, ...rest] = contour;
+      return `M${f(start[0])},${f(start[1])}` + rest.map(p => `L${f(p[0])},${f(p[1])}`).join('') + 'Z';
+    }).join('');
+  }).join('');
+}
 
 function escSvg(s) {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -1002,7 +1749,7 @@ function calcNormal(a, b, c) {
 // ============================================================
 async function export3MF() {
   try {
-    const rawObjs = buildExportObjects();
+    const rawObjs = buildExportObjects().filter(obj => obj.tris.length > 0);
 
     // 頂点重複排除してインデックスメッシュに変換
     const meshObjs = rawObjs.map((obj, i) => {
@@ -1016,7 +1763,7 @@ async function export3MF() {
           return vertMap.get(key);
         }));
       }
-      return { id: i + 1, color: obj.color, verts, tris: idxTris };
+      return { id: i + 1, name: obj.name, color: obj.color, verts, tris: idxTris };
     });
 
     const xml = build3MFXml(meshObjs);
@@ -1029,8 +1776,9 @@ async function export3MF() {
 }
 
 function build3MFXml(objects) {
+  const colorGroupId = objects.length + 1;
   const colorsXml = objects.map(obj => {
-    const c = obj.color.replace('#', '').toUpperCase().padEnd(6, '0');
+    const c = normalize3MFColor(obj.color);
     return `      <m:color color="#${c}FF"/>`;
   }).join('\n');
 
@@ -1041,7 +1789,7 @@ function build3MFXml(objects) {
     const trisXml = obj.tris.map(([a,b,c]) =>
       `          <triangle v1="${a}" v2="${b}" v3="${c}"/>`
     ).join('\n');
-    return `    <object id="${obj.id}" type="model" m:colorid="1" m:colorindex="${i}">
+    return `    <object id="${obj.id}" type="model" name="${escXmlAttr(obj.name)}" pid="${colorGroupId}" pindex="${i}">
       <mesh>
         <vertices>
 ${vertsXml}
@@ -1058,9 +1806,10 @@ ${trisXml}
   return `<?xml version="1.0" encoding="UTF-8"?>
 <model unit="millimeter"
   xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02"
-  xmlns:m="http://schemas.microsoft.com/3dmanufacturing/material/2015/02">
+  xmlns:m="http://schemas.microsoft.com/3dmanufacturing/material/2015/02"
+  requiredextensions="m">
   <resources>
-    <m:colorgroup id="1">
+    <m:colorgroup id="${colorGroupId}">
 ${colorsXml}
     </m:colorgroup>
 ${objsXml}
@@ -1069,6 +1818,21 @@ ${objsXml}
 ${buildXml}
   </build>
 </model>`;
+}
+
+function normalize3MFColor(color) {
+  const hex = String(color || '').replace('#', '').trim();
+  if (/^[0-9a-fA-F]{6}$/.test(hex)) return hex.toUpperCase();
+  if (/^[0-9a-fA-F]{3}$/.test(hex)) return hex.split('').map(ch => ch + ch).join('').toUpperCase();
+  return '000000';
+}
+
+function escXmlAttr(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 }
 
 // ============================================================
