@@ -163,7 +163,7 @@
 
 <header>
   <h1>名刺ジェネレーター</h1>
-  <span id="font-badge" class="badge">近似モード</span>
+  <span id="font-badge" class="badge">canvasモード（フォント不要）</span>
   <div class="spacer"></div>
   <button class="export-btn" onclick="exportSTL()">STL</button>
   <button class="export-btn green" onclick="export3MF()">3MF（OrcaSlicer）</button>
@@ -642,21 +642,96 @@ function extrudeContourGroup(outer, holes, z0, height) {
 }
 
 function textToTriangles(el, baseZ) {
-  const fontSizeMM = el.size * 0.353;
+  if (loadedFont) return textToTrianglesFont(el, baseZ);
+  return textToTrianglesCanvas(el, baseZ);
+}
 
-  if (!loadedFont) {
-    // フォント未読込時：バウンディングボックス近似
-    const approxW = el.text.length * fontSizeMM * 0.6;
-    const approxH = fontSizeMM * 0.8;
-    return boxTriangles(el.x, el.y - approxH, baseZ, approxW, approxH, el.extrude);
+// opentype.js フォントアウトラインを押し出し
+function textToTrianglesFont(el, baseZ) {
+  const fontSizeMM = el.size * 0.353;
+  try {
+    const path = loadedFont.getPath(el.text, el.x, el.y, fontSizeMM);
+    const contours = pathToContours(path.commands);
+    if (contours.length === 0) return textToTrianglesCanvas(el, baseZ);
+    const groups = organizeContours(contours);
+    if (groups.length === 0) return textToTrianglesCanvas(el, baseZ);
+    return groups.flatMap(({ outer, holes }) => extrudeContourGroup(outer, holes, baseZ, el.extrude));
+  } catch(e) {
+    console.warn('font geometry failed, falling back to canvas:', e);
+    return textToTrianglesCanvas(el, baseZ);
+  }
+}
+
+// canvas ピクセル → ボクセル化（フォントファイル不要・日本語対応）
+function textToTrianglesCanvas(el, baseZ) {
+  const fontSizeMM = el.size * 0.353;
+  const pxPerMM   = 20;
+  const voxelMM   = Math.max(0.15, fontSizeMM / 30); // フォントサイズに合わせて解像度を調整
+  const voxelPx   = voxelMM * pxPerMM;
+
+  const tmp = document.createElement('canvas');
+  const tc  = tmp.getContext('2d');
+  const fontPx  = fontSizeMM * pxPerMM;
+  const fontStr = `${el.bold ? 'bold ' : ''}${fontPx}px system-ui, sans-serif`;
+  tc.font = fontStr;
+  const met = tc.measureText(el.text);
+
+  const pad = Math.ceil(voxelPx * 2);
+  const W = Math.ceil(met.width) + pad * 2;
+  const H = Math.ceil(fontPx * 1.4) + pad * 2;
+  tmp.width = W; tmp.height = H;
+
+  tc.font = fontStr;
+  tc.fillStyle = 'white';
+  tc.fillText(el.text, pad, fontPx + pad * 0.5);
+
+  const imgData = tc.getImageData(0, 0, W, H).data;
+  const cellsX  = Math.ceil(W / voxelPx);
+  const cellsY  = Math.ceil(H / voxelPx);
+
+  // 各セルが「オン」かどうかをグリッドに記録
+  const grid = new Uint8Array(cellsX * cellsY);
+  for (let cj = 0; cj < cellsY; cj++) {
+    for (let ci = 0; ci < cellsX; ci++) {
+      const x0 = Math.floor(ci * voxelPx), x1 = Math.min(W, Math.ceil((ci+1) * voxelPx));
+      const y0 = Math.floor(cj * voxelPx), y1 = Math.min(H, Math.ceil((cj+1) * voxelPx));
+      let on = 0, total = 0;
+      for (let y = y0; y < y1; y++)
+        for (let x = x0; x < x1; x++) {
+          if (imgData[(y * W + x) * 4 + 3] > 64) on++;
+          total++;
+        }
+      grid[cj * cellsX + ci] = (total > 0 && on / total > 0.35) ? 1 : 0;
+    }
   }
 
-  const path = loadedFont.getPath(el.text, el.x, el.y, fontSizeMM);
-  const contours = pathToContours(path.commands);
-  if (contours.length === 0) return [];
+  const isOn = (ci, cj) => ci >= 0 && ci < cellsX && cj >= 0 && cj < cellsY && grid[cj * cellsX + ci] === 1;
 
-  const groups = organizeContours(contours);
-  return groups.flatMap(({ outer, holes }) => extrudeContourGroup(outer, holes, baseZ, el.extrude));
+  const ox   = el.x - pad / pxPerMM;
+  const oy   = el.y - fontPx / pxPerMM - (pad * 0.5) / pxPerMM;
+  const topZ = baseZ + el.extrude;
+  const tris = [];
+
+  for (let cj = 0; cj < cellsY; cj++) {
+    for (let ci = 0; ci < cellsX; ci++) {
+      if (!isOn(ci, cj)) continue;
+      const x0 = ox + ci * voxelMM, y0 = oy + cj * voxelMM;
+      const x1 = x0 + voxelMM,      y1 = y0 + voxelMM;
+
+      // 上面
+      tris.push([[x0,y0,topZ],[x1,y0,topZ],[x1,y1,topZ]]);
+      tris.push([[x0,y0,topZ],[x1,y1,topZ],[x0,y1,topZ]]);
+      // 下面
+      tris.push([[x0,y0,baseZ],[x1,y1,baseZ],[x1,y0,baseZ]]);
+      tris.push([[x0,y0,baseZ],[x0,y1,baseZ],[x1,y1,baseZ]]);
+      // 側面（隣が空のときだけ）
+      if (!isOn(ci-1,cj)) { tris.push([[x0,y1,baseZ],[x0,y0,baseZ],[x0,y0,topZ]]); tris.push([[x0,y1,baseZ],[x0,y0,topZ],[x0,y1,topZ]]); }
+      if (!isOn(ci+1,cj)) { tris.push([[x1,y0,baseZ],[x1,y1,baseZ],[x1,y1,topZ]]); tris.push([[x1,y0,baseZ],[x1,y1,topZ],[x1,y0,topZ]]); }
+      if (!isOn(ci,cj-1)) { tris.push([[x0,y0,baseZ],[x1,y0,baseZ],[x1,y0,topZ]]); tris.push([[x0,y0,baseZ],[x1,y0,topZ],[x0,y0,topZ]]); }
+      if (!isOn(ci,cj+1)) { tris.push([[x1,y1,baseZ],[x0,y1,baseZ],[x0,y1,topZ]]); tris.push([[x1,y1,baseZ],[x0,y1,topZ],[x1,y1,topZ]]); }
+    }
+  }
+  return tris;
 }
 
 // ============================================================
