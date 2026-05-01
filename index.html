@@ -133,16 +133,22 @@
 
   .canvas-area {
     flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
     background: #111;
     overflow: hidden;
+    position: relative;
   }
   #namecard-canvas {
-    display: block;
+    position: absolute;
     cursor: default;
     box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+    transform-origin: 0 0;
+  }
+  .zoom-hint {
+    position: absolute;
+    bottom: 10px; right: 12px;
+    font-size: 11px; color: #555;
+    pointer-events: none;
+    user-select: none;
   }
 
   .badge {
@@ -165,6 +171,7 @@
   <h1>名刺ジェネレーター</h1>
   <span id="font-badge" class="badge">canvasモード（フォント不要）</span>
   <div class="spacer"></div>
+  <button class="export-btn" style="background:#7c3aed" onclick="exportSVG()">SVG</button>
   <button class="export-btn" onclick="exportSTL()">STL</button>
   <button class="export-btn green" onclick="export3MF()">3MF（OrcaSlicer）</button>
 </header>
@@ -233,8 +240,9 @@
   </div>
 
   <!-- キャンバスエリア -->
-  <div class="canvas-area">
+  <div class="canvas-area" id="canvas-area">
     <canvas id="namecard-canvas"></canvas>
+    <div class="zoom-hint">ホイール: ズーム　ドラッグ(空白): パン　ダブルクリック: リセット</div>
   </div>
 </div>
 
@@ -247,6 +255,33 @@ let cardW = 91, cardH = 55;
 let selectedId = null;
 let dragState = null;
 let loadedFont = null;
+
+// ビュー変換
+let viewZoom = 1;
+let viewPanX = 0, viewPanY = 0;
+let panState  = null; // { startX, startY, startPanX, startPanY }
+
+const canvasArea = document.getElementById('canvas-area');
+
+function applyViewTransform() {
+  canvas.style.transform = `translate(${viewPanX}px,${viewPanY}px) scale(${viewZoom})`;
+}
+
+function centerView() {
+  const aw = canvasArea.clientWidth, ah = canvasArea.clientHeight;
+  viewPanX = (aw - canvas.width  * viewZoom) / 2;
+  viewPanY = (ah - canvas.height * viewZoom) / 2;
+  applyViewTransform();
+}
+
+// マウス座標 → カード内 mm 座標（ズーム・パン補正済み）
+function clientToMM(clientX, clientY) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: (clientX - rect.left) / (SCALE * viewZoom),
+    y: (clientY - rect.top)  / (SCALE * viewZoom),
+  };
+}
 
 let elements = [
   { id: uid(), text: '山田 太郎',           x: 8, y: 14, size: 18, bold: true,  color: '#111111', extrude: 0.5 },
@@ -314,11 +349,13 @@ function onCardSizeChange() {
 const canvas = document.getElementById('namecard-canvas');
 const ctx = canvas.getContext('2d');
 
-function renderCanvas() {
+function renderCanvas(recenter = false) {
   cardW = +document.getElementById('card-w').value || 91;
   cardH = +document.getElementById('card-h').value || 55;
+  const prevW = canvas.width, prevH = canvas.height;
   canvas.width  = cardW * SCALE;
   canvas.height = cardH * SCALE;
+  if (recenter || prevW !== canvas.width || prevH !== canvas.height) centerView();
 
   ctx.fillStyle = document.getElementById('base-color').value;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -419,12 +456,11 @@ function deleteElement(id) {
 }
 
 // ============================================================
-// ドラッグ
+// 要素ドラッグ & ビューパン
 // ============================================================
 canvas.addEventListener('mousedown', e => {
-  const rect = canvas.getBoundingClientRect();
-  const mx = (e.clientX - rect.left) / SCALE;
-  const my = (e.clientY - rect.top)  / SCALE;
+  if (e.button !== 0) return;
+  const { x: mx, y: my } = clientToMM(e.clientX, e.clientY);
 
   let hit = null;
   for (let i = elements.length - 1; i >= 0; i--) {
@@ -443,30 +479,69 @@ canvas.addEventListener('mousedown', e => {
     dragState = { id: hit.id, startMX: mx, startMY: my, startX: hit.x, startY: hit.y };
     canvas.style.cursor = 'grabbing';
   } else {
-    selectedId = null;
-    document.getElementById('properties-panel').classList.add('hidden');
-    renderElementList();
-    renderCanvas();
+    // 空白クリック → パン開始（mouseup で移動量が少なければ deselect）
+    panState = { startX: e.clientX, startY: e.clientY, startPanX: viewPanX, startPanY: viewPanY, moved: false };
+    canvas.style.cursor = 'grab';
   }
 });
 
-canvas.addEventListener('mousemove', e => {
-  if (!dragState) return;
-  const rect = canvas.getBoundingClientRect();
-  const mx = (e.clientX - rect.left) / SCALE;
-  const my = (e.clientY - rect.top)  / SCALE;
-  const el = elements.find(e => e.id === dragState.id);
-  if (el) {
-    el.x = Math.round((dragState.startX + mx - dragState.startMX) * 10) / 10;
-    el.y = Math.round((dragState.startY + my - dragState.startMY) * 10) / 10;
-    document.getElementById('prop-x').value = el.x;
-    document.getElementById('prop-y').value = el.y;
-    renderCanvas();
+window.addEventListener('mousemove', e => {
+  if (dragState) {
+    const { x: mx, y: my } = clientToMM(e.clientX, e.clientY);
+    const el = elements.find(el => el.id === dragState.id);
+    if (el) {
+      el.x = Math.round((dragState.startX + mx - dragState.startMX) * 10) / 10;
+      el.y = Math.round((dragState.startY + my - dragState.startMY) * 10) / 10;
+      document.getElementById('prop-x').value = el.x;
+      document.getElementById('prop-y').value = el.y;
+      renderCanvas();
+    }
+  } else if (panState) {
+    const dx = e.clientX - panState.startX;
+    const dy = e.clientY - panState.startY;
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) panState.moved = true;
+    viewPanX = panState.startPanX + dx;
+    viewPanY = panState.startPanY + dy;
+    applyViewTransform();
   }
 });
 
-canvas.addEventListener('mouseup',    () => { dragState = null; canvas.style.cursor = 'default'; });
-canvas.addEventListener('mouseleave', () => { dragState = null; canvas.style.cursor = 'default'; });
+window.addEventListener('mouseup', e => {
+  if (dragState) {
+    dragState = null;
+    canvas.style.cursor = 'default';
+  } else if (panState) {
+    if (!panState.moved) {
+      // 移動なし → deselect
+      selectedId = null;
+      document.getElementById('properties-panel').classList.add('hidden');
+      renderElementList();
+      renderCanvas();
+    }
+    panState = null;
+    canvas.style.cursor = 'default';
+  }
+});
+
+// ホイール: ズーム（マウス位置固定）
+canvasArea.addEventListener('wheel', e => {
+  e.preventDefault();
+  const areaRect = canvasArea.getBoundingClientRect();
+  const mx = e.clientX - areaRect.left; // canvasArea内のCSS px
+  const my = e.clientY - areaRect.top;
+  const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
+  const newZoom = Math.max(0.2, Math.min(10, viewZoom * factor));
+  viewPanX = mx - (mx - viewPanX) * newZoom / viewZoom;
+  viewPanY = my - (my - viewPanY) * newZoom / viewZoom;
+  viewZoom = newZoom;
+  applyViewTransform();
+}, { passive: false });
+
+// ダブルクリック: ビューリセット
+canvasArea.addEventListener('dblclick', e => {
+  viewZoom = 1;
+  centerView();
+});
 
 // ============================================================
 // ジオメトリ：ボックス
@@ -641,6 +716,15 @@ function extrudeContourGroup(outer, holes, z0, height) {
   return tris;
 }
 
+// canvas Y（下増加）→ 3D Y（上増加）に変換し、法線の向きも補正
+function flipY(tris) {
+  return tris.map(([a, b, c]) => [
+    [a[0], cardH - a[1], a[2]],
+    [c[0], cardH - c[1], c[2]], // b↔c 入替で法線反転を補正
+    [b[0], cardH - b[1], b[2]],
+  ]);
+}
+
 function textToTriangles(el, baseZ) {
   if (loadedFont) return textToTrianglesFont(el, baseZ);
   return textToTrianglesCanvas(el, baseZ);
@@ -655,7 +739,7 @@ function textToTrianglesFont(el, baseZ) {
     if (contours.length === 0) return textToTrianglesCanvas(el, baseZ);
     const groups = organizeContours(contours);
     if (groups.length === 0) return textToTrianglesCanvas(el, baseZ);
-    return groups.flatMap(({ outer, holes }) => extrudeContourGroup(outer, holes, baseZ, el.extrude));
+    return flipY(groups.flatMap(({ outer, holes }) => extrudeContourGroup(outer, holes, baseZ, el.extrude)));
   } catch(e) {
     console.warn('font geometry failed, falling back to canvas:', e);
     return textToTrianglesCanvas(el, baseZ);
@@ -731,7 +815,7 @@ function textToTrianglesCanvas(el, baseZ) {
       if (!isOn(ci,cj+1)) { tris.push([[x1,y1,baseZ],[x0,y1,baseZ],[x0,y1,topZ]]); tris.push([[x1,y1,baseZ],[x0,y1,topZ],[x1,y1,topZ]]); }
     }
   }
-  return tris;
+  return flipY(tris);
 }
 
 // ============================================================
@@ -751,6 +835,58 @@ function buildExportObjects() {
 // ============================================================
 // STL エクスポート
 // ============================================================
+// ============================================================
+// SVG エクスポート（ベクター）
+// ============================================================
+function exportSVG() {
+  try {
+    const baseColor = document.getElementById('base-color').value;
+    const lines = [
+      `<svg xmlns="http://www.w3.org/2000/svg"`,
+      `     width="${cardW}mm" height="${cardH}mm"`,
+      `     viewBox="0 0 ${cardW} ${cardH}">`,
+      `  <rect width="${cardW}" height="${cardH}" fill="${baseColor}"/>`,
+    ];
+
+    for (const el of elements) {
+      const fontSize = (el.size * 0.353).toFixed(4);
+      if (loadedFont) {
+        // opentype.js → SVG <path>（完全ベクター・フォント不要）
+        const opPath = loadedFont.getPath(el.text, el.x, el.y, parseFloat(fontSize));
+        const d = opPath.commands.map(cmd => {
+          switch (cmd.type) {
+            case 'M': return `M${f(cmd.x)},${f(cmd.y)}`;
+            case 'L': return `L${f(cmd.x)},${f(cmd.y)}`;
+            case 'C': return `C${f(cmd.x1)},${f(cmd.y1)},${f(cmd.x2)},${f(cmd.y2)},${f(cmd.x)},${f(cmd.y)}`;
+            case 'Q': return `Q${f(cmd.x1)},${f(cmd.y1)},${f(cmd.x)},${f(cmd.y)}`;
+            case 'Z': return 'Z';
+            default:  return '';
+          }
+        }).join('');
+        lines.push(`  <path fill="${el.color}" d="${d}"/>`);
+      } else {
+        // <text> 要素（システムフォント依存だが完全ベクター）
+        const bold = el.bold ? ' font-weight="bold"' : '';
+        lines.push(`  <text x="${el.x}" y="${el.y}" font-size="${fontSize}"${bold} fill="${el.color}" font-family="system-ui, sans-serif">${escSvg(el.text)}</text>`);
+      }
+    }
+
+    lines.push('</svg>');
+    const svg = lines.join('\n');
+    const bytes = new TextEncoder().encode(svg);
+    downloadBlob(bytes.buffer, 'namecard.svg', 'image/svg+xml');
+  } catch(e) {
+    alert('SVGエクスポートエラー: ' + e.message);
+    console.error(e);
+  }
+}
+
+function f(n) { return n.toFixed(4); }
+
+function escSvg(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 function exportSTL() {
   try {
     const allTris = buildExportObjects().flatMap(o => o.tris);
@@ -956,7 +1092,8 @@ function downloadBlob(data, filename, mime) {
 // 初期化
 // ============================================================
 renderElementList();
-renderCanvas();
+renderCanvas(true); // 初回は中央に配置
+window.addEventListener('resize', () => centerView());
 </script>
 </body>
 </html>
