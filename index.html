@@ -672,6 +672,10 @@ function organizeContours(contours) {
 }
 
 function extrudeContourGroup(outer, holes, z0, height) {
+  // earcut用巻き方向正規化（canvas Y下増加系: outer=正面積/CW、hole=負面積/CCW）
+  if (signedArea(outer) < 0) outer = outer.slice().reverse();
+  holes = holes.map(h => signedArea(h) > 0 ? h.slice().reverse() : h);
+
   const tris = [];
   const z1 = z0 + height;
 
@@ -747,75 +751,145 @@ function textToTrianglesFont(el, baseZ) {
 }
 
 // canvas ピクセル → ボクセル化（フォントファイル不要・日本語対応）
+// canvas モード：マーチングスクエア法でアウトラインを抽出 → 滑らかな押し出しメッシュ
 function textToTrianglesCanvas(el, baseZ) {
   const fontSizeMM = el.size * 0.353;
-  const pxPerMM   = 20;
-  const voxelMM   = Math.max(0.15, fontSizeMM / 30); // フォントサイズに合わせて解像度を調整
-  const voxelPx   = voxelMM * pxPerMM;
+  const pxPerMM   = 40; // 高解像度レンダリング
+  const fontPx    = fontSizeMM * pxPerMM;
 
   const tmp = document.createElement('canvas');
   const tc  = tmp.getContext('2d');
-  const fontPx  = fontSizeMM * pxPerMM;
   const fontStr = `${el.bold ? 'bold ' : ''}${fontPx}px system-ui, sans-serif`;
   tc.font = fontStr;
   const met = tc.measureText(el.text);
 
-  const pad = Math.ceil(voxelPx * 2);
-  const W = Math.ceil(met.width) + pad * 2;
-  const H = Math.ceil(fontPx * 1.4) + pad * 2;
+  const padPx = Math.ceil(fontPx * 0.4);
+  const W = Math.ceil(met.width) + padPx * 2;
+  const H = Math.ceil(fontPx * 1.5) + padPx * 2;
   tmp.width = W; tmp.height = H;
 
   tc.font = fontStr;
   tc.fillStyle = 'white';
-  tc.fillText(el.text, pad, fontPx + pad * 0.5);
+  tc.fillText(el.text, padPx, fontPx + padPx * 0.5);
 
-  const imgData = tc.getImageData(0, 0, W, H).data;
-  const cellsX  = Math.ceil(W / voxelPx);
-  const cellsY  = Math.ceil(H / voxelPx);
+  const alpha = tc.getImageData(0, 0, W, H).data;
+  const pix   = new Uint8Array(W * H);
+  for (let i = 0; i < W * H; i++) pix[i] = alpha[i * 4 + 3] > 100 ? 1 : 0;
 
-  // 各セルが「オン」かどうかをグリッドに記録
-  const grid = new Uint8Array(cellsX * cellsY);
-  for (let cj = 0; cj < cellsY; cj++) {
-    for (let ci = 0; ci < cellsX; ci++) {
-      const x0 = Math.floor(ci * voxelPx), x1 = Math.min(W, Math.ceil((ci+1) * voxelPx));
-      const y0 = Math.floor(cj * voxelPx), y1 = Math.min(H, Math.ceil((cj+1) * voxelPx));
-      let on = 0, total = 0;
-      for (let y = y0; y < y1; y++)
-        for (let x = x0; x < x1; x++) {
-          if (imgData[(y * W + x) * 4 + 3] > 64) on++;
-          total++;
-        }
-      grid[cj * cellsX + ci] = (total > 0 && on / total > 0.35) ? 1 : 0;
+  // マーチングスクエアでアウトライン輪郭線を抽出
+  const pixContours = marchingSquares(pix, W, H);
+  if (pixContours.length === 0) return [];
+
+  // ピクセル座標 → mm 座標に変換
+  const ox = el.x - padPx / pxPerMM;
+  const oy = el.y - fontPx / pxPerMM - (padPx * 0.5) / pxPerMM;
+  const mmContours = pixContours.map(c =>
+    douglasPeucker(c.map(([px, py]) => [ox + px / pxPerMM, oy + py / pxPerMM]), 0.05)
+  ).filter(c => c.length >= 3 && Math.abs(signedArea(c)) > 0.05);
+
+  if (mmContours.length === 0) return [];
+
+  const groups = organizeContours(mmContours);
+  return flipY(groups.flatMap(({ outer, holes }) =>
+    extrudeContourGroup(outer, holes, baseZ, el.extrude)
+  ));
+}
+
+// ============================================================
+// マーチングスクエア法（バイナリ画像 → 輪郭ポリゴン群）
+// ============================================================
+function marchingSquares(pix, W, H) {
+  const isOn = (x, y) => x >= 0 && x < W && y >= 0 && y < H && pix[y * W + x];
+
+  // 各2×2セルで引くべきエッジ（エッジ番号: 0=上,1=右,2=下,3=左）
+  const SEG = [
+    [],          // 0
+    [[3,2]],     // 1
+    [[2,1]],     // 2
+    [[3,1]],     // 3
+    [[0,1]],     // 4
+    [[0,1],[3,2]],// 5 鞍点
+    [[0,2]],     // 6
+    [[0,3]],     // 7
+    [[0,3]],     // 8
+    [[0,2]],     // 9
+    [[0,3],[2,1]],// 10 鞍点
+    [[0,1]],     // 11
+    [[3,1]],     // 12
+    [[2,1]],     // 13
+    [[3,2]],     // 14
+    [],          // 15
+  ];
+
+  // エッジの中点座標
+  const ep = (e, x, y) => {
+    if (e === 0) return [x + 0.5, y];
+    if (e === 1) return [x + 1,   y + 0.5];
+    if (e === 2) return [x + 0.5, y + 1];
+    return             [x,        y + 0.5];
+  };
+
+  // 隣接グラフを構築
+  const adj  = new Map();
+  const pts  = new Map();
+  const add  = (a, b) => {
+    const ka = `${a[0]},${a[1]}`, kb = `${b[0]},${b[1]}`;
+    pts.set(ka, a); pts.set(kb, b);
+    (adj.get(ka) ?? (adj.set(ka, []), adj.get(ka))).push(kb);
+    (adj.get(kb) ?? (adj.set(kb, []), adj.get(kb))).push(ka);
+  };
+
+  for (let y = 0; y < H - 1; y++)
+    for (let x = 0; x < W - 1; x++) {
+      const idx = (isOn(x,y)?8:0)|(isOn(x+1,y)?4:0)|(isOn(x+1,y+1)?2:0)|(isOn(x,y+1)?1:0);
+      for (const [e1, e2] of SEG[idx]) add(ep(e1,x,y), ep(e2,x,y));
     }
-  }
 
-  const isOn = (ci, cj) => ci >= 0 && ci < cellsX && cj >= 0 && cj < cellsY && grid[cj * cellsX + ci] === 1;
+  // 閉じた輪郭を辿る
+  const visited  = new Set();
+  const contours = [];
 
-  const ox   = el.x - pad / pxPerMM;
-  const oy   = el.y - fontPx / pxPerMM - (pad * 0.5) / pxPerMM;
-  const topZ = baseZ + el.extrude;
-  const tris = [];
+  for (const startKey of adj.keys()) {
+    if (visited.has(startKey)) continue;
+    const nbrs = adj.get(startKey);
+    if (!nbrs || nbrs.length !== 2) continue;
 
-  for (let cj = 0; cj < cellsY; cj++) {
-    for (let ci = 0; ci < cellsX; ci++) {
-      if (!isOn(ci, cj)) continue;
-      const x0 = ox + ci * voxelMM, y0 = oy + cj * voxelMM;
-      const x1 = x0 + voxelMM,      y1 = y0 + voxelMM;
+    const contour = [pts.get(startKey)];
+    visited.add(startKey);
+    let prev = startKey, curr = nbrs[0];
 
-      // 上面
-      tris.push([[x0,y0,topZ],[x1,y0,topZ],[x1,y1,topZ]]);
-      tris.push([[x0,y0,topZ],[x1,y1,topZ],[x0,y1,topZ]]);
-      // 下面
-      tris.push([[x0,y0,baseZ],[x1,y1,baseZ],[x1,y0,baseZ]]);
-      tris.push([[x0,y0,baseZ],[x0,y1,baseZ],[x1,y1,baseZ]]);
-      // 側面（隣が空のときだけ）
-      if (!isOn(ci-1,cj)) { tris.push([[x0,y1,baseZ],[x0,y0,baseZ],[x0,y0,topZ]]); tris.push([[x0,y1,baseZ],[x0,y0,topZ],[x0,y1,topZ]]); }
-      if (!isOn(ci+1,cj)) { tris.push([[x1,y0,baseZ],[x1,y1,baseZ],[x1,y1,topZ]]); tris.push([[x1,y0,baseZ],[x1,y1,topZ],[x1,y0,topZ]]); }
-      if (!isOn(ci,cj-1)) { tris.push([[x0,y0,baseZ],[x1,y0,baseZ],[x1,y0,topZ]]); tris.push([[x0,y0,baseZ],[x1,y0,topZ],[x0,y0,topZ]]); }
-      if (!isOn(ci,cj+1)) { tris.push([[x1,y1,baseZ],[x0,y1,baseZ],[x0,y1,topZ]]); tris.push([[x1,y1,baseZ],[x0,y1,topZ],[x1,y1,topZ]]); }
+    while (curr !== startKey) {
+      if (visited.has(curr)) break;
+      visited.add(curr);
+      contour.push(pts.get(curr));
+      const next = (adj.get(curr) ?? []).find(k => k !== prev);
+      if (!next) break;
+      prev = curr; curr = next;
     }
+    if (contour.length >= 3) contours.push(contour);
   }
-  return flipY(tris);
+  return contours;
+}
+
+// Ramer–Douglas–Peucker 折れ線簡略化
+function douglasPeucker(pts, eps) {
+  if (pts.length <= 2) return pts;
+  const [x1, y1] = pts[0], [x2, y2] = pts[pts.length - 1];
+  const len = Math.hypot(x2 - x1, y2 - y1);
+  let maxD = 0, maxI = 0;
+  for (let i = 1; i < pts.length - 1; i++) {
+    const [px, py] = pts[i];
+    const d = len < 1e-10
+      ? Math.hypot(px - x1, py - y1)
+      : Math.abs((y2-y1)*px - (x2-x1)*py + x2*y1 - y2*x1) / len;
+    if (d > maxD) { maxD = d; maxI = i; }
+  }
+  if (maxD > eps) {
+    const l = douglasPeucker(pts.slice(0, maxI + 1), eps);
+    const r = douglasPeucker(pts.slice(maxI), eps);
+    return [...l.slice(0, -1), ...r];
+  }
+  return [pts[0], pts[pts.length - 1]];
 }
 
 // ============================================================
@@ -863,7 +937,7 @@ function exportSVG() {
             default:  return '';
           }
         }).join('');
-        lines.push(`  <path fill="${el.color}" d="${d}"/>`);
+        lines.push(`  <path fill="${el.color}" fill-rule="evenodd" d="${d}"/>`);
       } else {
         // <text> 要素（システムフォント依存だが完全ベクター）
         const bold = el.bold ? ' font-weight="bold"' : '';
