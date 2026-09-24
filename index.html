@@ -157,6 +157,7 @@
     cursor: default;
     box-shadow: 0 8px 40px rgba(0,0,0,0.6);
     transform-origin: 0 0;
+    touch-action: none;
   }
   .zoom-hint {
     position: absolute;
@@ -243,6 +244,41 @@
   .shared-card-content p { margin-bottom: 22px; color: #9ca3af; }
   .shared-card-image { display: block; width: 100%; height: auto; border-radius: 8px; box-shadow: 0 24px 70px rgba(0,0,0,0.55); }
   .shared-card-download { display: inline-block; margin-top: 22px; padding: 10px 20px; border-radius: 6px; background: #16a34a; color: #fff; text-decoration: none; }
+
+  @media (max-width: 720px) {
+    body:not(.shared-card-view) { height: auto; min-height: 100vh; }
+    header { padding: 10px 12px; gap: 8px; }
+    header h1 { flex: 1; font-size: 15px; }
+    header .badge, header .spacer { display: none; }
+    button.export-btn { min-height: 44px; padding: 10px 14px; }
+
+    .main { flex: none; flex-direction: column; overflow: visible; }
+    .canvas-area {
+      order: 1; flex: none; width: 100%; height: min(68vw, 330px); min-height: 240px;
+      border-bottom: 1px solid #333;
+    }
+    .panel { order: 2; width: 100%; overflow: visible; border-right: 0; }
+    .panel-section { padding: 16px; }
+    .element-list, .properties { padding: 16px; }
+
+    input[type="text"], input[type="number"], select,
+    button.add-btn, .template-btn, .background-design-btn, .element-item {
+      min-height: 44px;
+    }
+    input[type="text"], input[type="number"], select { padding: 10px; font-size: 16px; }
+    input[type="color"] { height: 44px; }
+    .font-drop { min-height: 48px; padding: 14px 12px; }
+    .question-option { min-height: 44px; padding: 10px; align-items: center; }
+    .question-option input { width: 18px; height: 18px; margin-top: 0; }
+    .element-item .del-btn { min-width: 44px; min-height: 44px; font-size: 18px; }
+    .zoom-hint { right: 8px; bottom: 6px; font-size: 10px; }
+
+    .export-modal { padding: 8px; }
+    .export-dialog { width: 100%; max-height: calc(100dvh - 16px); padding: 14px; }
+    .export-preview-wrap { padding: 10px; }
+    .share-link-row, .export-actions { flex-direction: column; }
+    .share-copy, .export-actions button { width: 100%; min-height: 44px; }
+  }
 </style>
 </head>
 <body>
@@ -460,6 +496,12 @@ function applyViewTransform() {
 
 function centerView() {
   const aw = canvasArea.clientWidth, ah = canvasArea.clientHeight;
+  if (window.matchMedia('(max-width: 720px)').matches) {
+    const padding = 24;
+    const fitWidth = Math.max(1, aw - padding) / (cardW * PREVIEW_SCALE);
+    const fitHeight = Math.max(1, ah - padding) / (cardH * PREVIEW_SCALE);
+    viewZoom = Math.max(0.2, Math.min(1, fitWidth, fitHeight));
+  }
   viewPanX = (aw - cardW * PREVIEW_SCALE * viewZoom) / 2;
   viewPanY = (ah - cardH * PREVIEW_SCALE * viewZoom) / 2;
   applyViewTransform();
@@ -1545,8 +1587,9 @@ function deleteElement(id) {
 // ============================================================
 // 要素ドラッグ & ビューパン
 // ============================================================
-canvas.addEventListener('mousedown', e => {
+canvas.addEventListener('pointerdown', e => {
   if (e.button !== 0) return;
+  e.preventDefault();
   const { x: mx, y: my } = clientToMM(e.clientX, e.clientY);
 
   let hit = null;
@@ -1578,7 +1621,7 @@ canvas.addEventListener('mousedown', e => {
   }
 });
 
-window.addEventListener('mousemove', e => {
+window.addEventListener('pointermove', e => {
   if (dragState) {
     const { x: mx, y: my } = clientToMM(e.clientX, e.clientY);
     const el = elements.find(el => el.id === dragState.id);
@@ -1599,7 +1642,7 @@ window.addEventListener('mousemove', e => {
   }
 });
 
-window.addEventListener('mouseup', e => {
+function finishPointerInteraction() {
   if (dragState) {
     dragState = null;
     canvas.style.cursor = 'default';
@@ -1614,7 +1657,10 @@ window.addEventListener('mouseup', e => {
     panState = null;
     canvas.style.cursor = 'default';
   }
-});
+}
+
+window.addEventListener('pointerup', finishPointerInteraction);
+window.addEventListener('pointercancel', finishPointerInteraction);
 
 // ホイール: ズーム（マウス位置固定）
 canvasArea.addEventListener('wheel', e => {
