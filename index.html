@@ -178,6 +178,7 @@
     vertical-align: middle;
   }
   .badge.ok { background: #4ade8022; color: #4ade80; border-color: #4ade8044; }
+  .required-mark { color: #f87171; font-size: 10px; margin-left: 4px; }
 </style>
 </head>
 <body>
@@ -198,6 +199,15 @@
         <button class="template-btn" onclick="applyTemplate('business')">なまえ + ゆめ</button>
         <button class="template-btn" onclick="applyTemplate('qr-logo')">ロゴ + QR</button>
       </div>
+    </div>
+
+    <!-- プロフィール入力 -->
+    <div class="panel-section">
+      <h2>プロフィール入力</h2>
+      <label for="name-input">名前<span class="required-mark">必須</span></label>
+      <input type="text" id="name-input" required aria-required="true" placeholder="例：やまだ たろう" oninput="updateNameFromInput(this.value)">
+      <label for="dream-input">将来の夢<span class="required-mark">必須</span></label>
+      <input type="text" id="dream-input" required aria-required="true" placeholder="例：おいしゃさん" oninput="updateDreamFromInput(this.value)">
     </div>
 
     <!-- フォント -->
@@ -381,9 +391,9 @@ const DEFAULT_DREAM_ART = {
 };
 
 function createKidsElements() {
-  const dream = { id: uid(), role: 'dream', type: 'text', text: 'しょうらいのゆめ：うちゅうひこうし', x: 6, y: 19, size: 7, bold: true, color: '#2563eb', extrude: 0.4 };
+  const dream = { id: uid(), role: 'dream', type: 'text', text: 'しょうらいのゆめ：', x: 6, y: 19, size: 7, bold: true, color: '#2563eb', extrude: 0.4 };
   return [
-    { id: uid(), type: 'text', text: 'なまえ：やまだ たろう', x: 6, y: 10, size: 12, bold: true, color: '#111111', extrude: 0.5 },
+    { id: uid(), role: 'name', type: 'text', text: 'なまえ：', x: 6, y: 10, size: 12, bold: true, color: '#111111', extrude: 0.5 },
     dream,
     { id: uid(), type: 'text', text: '今ハマっていること：サッカー', x: 6, y: 28, size: 6, bold: true, color: '#444444', extrude: 0.3 },
     { id: uid(), type: 'text', text: '100万円あったら何する？：世界一周', x: 6, y: 37, size: 6, bold: true, color: '#444444', extrude: 0.3 },
@@ -421,6 +431,67 @@ function syncDreamIllustration() {
   const next = createDreamIllustrationElement(dream.text);
   if (current) Object.assign(current, next, { id: current.id, x: current.x, y: current.y });
   else elements.push(next);
+}
+
+function dreamAnswer(text) {
+  return String(text || '').replace(/^しょうらいのゆめ[：:]\s*/, '');
+}
+
+function nameAnswer(text) {
+  return String(text || '').replace(/^なまえ[：:]\s*/, '');
+}
+
+function syncNameInput() {
+  const input = document.getElementById('name-input');
+  const name = elements.find(el => el.role === 'name');
+  input.disabled = !name;
+  input.required = !!name;
+  input.value = name ? nameAnswer(name.text) : '';
+  input.setCustomValidity('');
+}
+
+function syncDreamInput() {
+  const input = document.getElementById('dream-input');
+  const dream = elements.find(el => el.role === 'dream');
+  input.disabled = !dream;
+  input.required = !!dream;
+  input.value = dream ? dreamAnswer(dream.text) : '';
+  input.setCustomValidity('');
+}
+
+function updateNameFromInput(value) {
+  const name = elements.find(el => el.role === 'name');
+  if (!name) return;
+  document.getElementById('name-input').setCustomValidity('');
+  name.text = `なまえ：${value}`;
+  if (selectedId === name.id) document.getElementById('prop-text').value = name.text;
+  renderElementList();
+  renderCanvas();
+}
+
+function updateDreamFromInput(value) {
+  const dream = elements.find(el => el.role === 'dream');
+  if (!dream) return;
+  document.getElementById('dream-input').setCustomValidity('');
+  dream.text = `しょうらいのゆめ：${value}`;
+  syncDreamIllustration();
+  if (selectedId === dream.id) document.getElementById('prop-text').value = dream.text;
+  renderElementList();
+  renderCanvas();
+}
+
+function validateRequiredProfile() {
+  const fields = [
+    { role: 'name', inputId: 'name-input', label: '名前' },
+    { role: 'dream', inputId: 'dream-input', label: '将来の夢' },
+  ];
+  for (const field of fields) {
+    if (!elements.some(el => el.role === field.role)) continue;
+    const input = document.getElementById(field.inputId);
+    input.setCustomValidity(input.value.trim() ? '' : `${field.label}を入力してください。`);
+    if (!input.reportValidity()) return false;
+  }
+  return true;
 }
 
 elements = createKidsElements();
@@ -489,6 +560,8 @@ function applyTemplate(name) {
     elements = createKidsElements();
   }
 
+  syncNameInput();
+  syncDreamInput();
   renderElementList();
   renderCanvas(true);
 }
@@ -1002,7 +1075,11 @@ function updateSelectedProp(key, value) {
   const el = elements.find(e => e.id === selectedId);
   if (!el) return;
   el[key] = value;
-  if (key === 'text' && el.role === 'dream') syncDreamIllustration();
+  if (key === 'text' && el.role === 'name') syncNameInput();
+  if (key === 'text' && el.role === 'dream') {
+    syncDreamIllustration();
+    syncDreamInput();
+  }
   if (key === 'x') document.getElementById('prop-x').value = value;
   if (key === 'y') document.getElementById('prop-y').value = value;
   renderElementList();
@@ -1116,6 +1193,8 @@ async function onLogoFileInput(input) {
 
 function deleteElement(id) {
   elements = elements.filter(el => el.id !== id);
+  syncNameInput();
+  syncDreamInput();
   if (selectedId === id) {
     selectedId = null;
     document.getElementById('properties-panel').classList.add('hidden');
@@ -1927,6 +2006,7 @@ function calcNormal(a, b, c) {
 // ============================================================
 async function export3MF() {
   try {
+    if (!validateRequiredProfile()) return;
     const rawObjs = buildExportObjects().filter(obj => obj.tris.length > 0);
 
     // 頂点重複排除してインデックスメッシュに変換
