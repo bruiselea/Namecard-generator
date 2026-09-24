@@ -240,6 +240,23 @@
   @media (max-width: 720px) {
     body:not(.shared-card-view) { height: auto; min-height: 100vh; }
     header { padding: 10px 12px; gap: 8px; flex-wrap: wrap; }
+    body.shared-card-view { width: 100%; min-height: 100dvh; overflow-x: hidden; }
+    body.shared-card-view > .shared-card-page {
+      width: 100%; min-height: 100dvh; padding: 20px 12px max(20px, env(safe-area-inset-bottom));
+      align-items: flex-start;
+    }
+    .shared-card-content { width: 100%; }
+    .shared-card-content h1 { margin-top: 4px; font-size: 20px; }
+    .shared-card-content p { margin-bottom: 16px; font-size: 13px; line-height: 1.6; }
+    .shared-card-image {
+      width: 100%; max-width: 100%; height: auto; border-radius: 6px;
+      box-shadow: 0 12px 36px rgba(0,0,0,0.5);
+    }
+    .shared-card-download {
+      display: inline-flex; width: 100%; min-height: 48px; margin-top: 20px;
+      align-items: center; justify-content: center; font-weight: 600;
+    }
+    header { padding: 10px 12px; gap: 8px; }
     header h1 { flex: 1; font-size: 15px; }
     header .badge, header .spacer { display: none; }
     header .draft-actions { order: 3; width: 100%; display: grid; grid-template-columns: repeat(3, 1fr); }
