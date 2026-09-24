@@ -195,7 +195,12 @@
   .background-preview { display: block; height: 24px; margin-bottom: 5px; border-radius: 3px; border: 1px solid #555; }
   .background-preview.plain { background: #fff; }
   .background-preview.sky { background: linear-gradient(165deg, #dbeafe 0 65%, #bfdbfe 65% 100%); }
-  .background-preview.cool { background: linear-gradient(135deg, #111827 0 12%, #e5e7eb 12% 72%, #22d3ee 72% 78%, #1f2937 78%); }
+  .background-preview.cool {
+    background:
+      linear-gradient(90deg, #111827 0 4%, #22d3ee 4% 5.5%, transparent 5.5%),
+      linear-gradient(180deg, #111827 0 10%, #22d3ee 10% 16%, transparent 16%),
+      #e5e7eb;
+  }
   .background-preview.cute { background: radial-gradient(circle at 22% 35%, #fb7185 0 8%, transparent 9%), radial-gradient(circle at 72% 65%, #f9a8d4 0 8%, transparent 9%), #fff1f2; }
   .export-modal {
     position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center;
@@ -501,12 +506,10 @@ const BACKGROUND_DESIGNS = {
   cool: {
     label: 'クール', baseColor: '#e5e7eb',
     shapes: [
-      { x: 0, y: 0, w: 1, h: 0.035, color: '#111827' },
-      { x: 0.965, y: 0, w: 0.035, h: 1, color: '#111827' },
-      { x: 0.78, y: 0.12, w: 0.18, h: 0.055, color: '#22d3ee' },
-      { x: 0.84, y: 0.19, w: 0.12, h: 0.045, color: '#374151' },
-      { x: 0.72, y: 0.76, w: 0.24, h: 0.045, color: '#111827' },
-      { x: 0.80, y: 0.83, w: 0.16, h: 0.055, color: '#22d3ee' },
+      { x: 0, y: 0, w: 1, h: 0.04, color: '#111827' },
+      { x: 0, y: 0.04, w: 1, h: 0.012, color: '#22d3ee' },
+      { x: 0, y: 0.052, w: 0.032, h: 0.948, color: '#111827' },
+      { x: 0.032, y: 0.052, w: 0.012, h: 0.948, color: '#22d3ee' },
     ],
   },
   cute: {
@@ -575,7 +578,7 @@ const DREAM_ART_LIBRARY = [
   },
   {
     label: 'おいしゃさん',
-    keywords: ['いしゃ', '医者', 'お医者', '医師', 'ドクター', 'かんご', '看護', '看護師', 'びょういん', '病院'],
+    keywords: ['いしゃ', '医者', 'お医者', 'かんご', '看護', 'びょういん', '病院'],
     palette: { R: '#ef4444', W: '#f8fafc', B: '#38bdf8' },
     pattern: [
       '....WWWW....', '...WWRRWW...', '...WWRRWW...', '..WWWWWWWW..',
@@ -693,106 +696,6 @@ const DREAM_ART_LIBRARY = [
       '.WBBBBBBBBW.', '..WWWWWWWW..', '............', '............',
     ],
   },
-  {
-    label: 'しょうぼうし',
-    keywords: ['消防士', 'しょうぼうし', '消防', 'しょうぼう', 'レスキュー'],
-    palette: { R: '#ef4444', Y: '#facc15', W: '#f8fafc' },
-    pattern: [
-      '............', '....RRRR....', '..RRRRRRRR..', '.RRRYYYYRRR.',
-      '.RRYYYYYYRR.', '..RRRRRRRR..', '...RWWWWR...', '...RWWWWR...',
-      '...RRRRRR...', '..RR....RR..', '..RR....RR..', '............',
-    ],
-  },
-  {
-    label: 'じゅういさん',
-    keywords: ['獣医', 'じゅうい', '動物病院', 'どうぶつびょういん'],
-    palette: { G: '#22c55e', W: '#f8fafc', P: '#f472b6' },
-    pattern: [
-      '..PP....PP..', '.PPPP..PPPP.', '.PPPP..PPPP.', '...PPPPPP...',
-      '..PPPPPPPP..', '.PPPPPPPPPP.', '.PPPPGGPPPP.', '..PPGGGGPP..',
-      '...PGWWGP...', '....GGGG....', '............', '............',
-    ],
-  },
-  {
-    label: 'はいしゃさん',
-    keywords: ['歯医者', 'はいしゃ', '歯科医', 'しかい'],
-    palette: { W: '#f8fafc', B: '#38bdf8' },
-    pattern: [
-      '...BB..BB...', '..BWWBBWWB..', '.BWWWWWWWWB.', '.BWWWWWWWWB.',
-      '.BWWWWWWWWB.', '..BWWWWWWB..', '..BWWWWWWB..', '...BWWBWWB..',
-      '...BWW..WWB.', '...BW....WB.', '...BB....BB.', '............',
-    ],
-  },
-  {
-    label: 'でんしゃのうんてんし',
-    keywords: ['電車の運転士', 'でんしゃのうんてんし', '運転士', 'うんてんし', '車掌', 'しゃしょう'],
-    palette: { B: '#3b82f6', W: '#f8fafc', K: '#1f2937' },
-    pattern: [
-      '..BBBBBBBB..', '.BBBBBBBBBB.', '.BWWWWWWWWB.', '.BWWBBBBWWB.',
-      '.BWWBBBBWWB.', '.BBBBBBBBBB.', '.BBWWWWWWBB.', '.BBBBBBBBBB.',
-      '..KK....KK..', '.KKK....KKK.', '............', '............',
-    ],
-  },
-  {
-    label: 'だいくさん',
-    keywords: ['大工', 'だいく', '建築家', 'けんちくか', '建設', 'けんせつ'],
-    palette: { Y: '#f59e0b', K: '#1f2937', W: '#f8fafc' },
-    pattern: [
-      '..YYYYYYYY..', '.YYYYYYYYYY.', '.YYWWWWWWYY.', '..YYYYYYYY..',
-      '.....KK.....', '....KK......', '...KK.......', '..KK........',
-      '.KK.........', 'KK..........', '............', '............',
-    ],
-  },
-  {
-    label: 'のうか',
-    keywords: ['農家', 'のうか', '農業', 'のうぎょう', '畑', 'はたけ'],
-    palette: { G: '#22c55e', Y: '#facc15', B: '#92400e' },
-    pattern: [
-      '.....G......', '....GGG.....', '..G.GGG.G...', '.GGGGGGGGG..',
-      '...GGGGG....', '....GGG.....', '.....B......', '.....B......',
-      '..YYYYYYYY..', '.YYYYYYYYYY.', '..YYYYYYYY..', '............',
-    ],
-  },
-  {
-    label: 'はなやさん',
-    keywords: ['花屋', 'はなや', 'フラワーショップ', 'フローリスト'],
-    palette: { P: '#f472b6', Y: '#facc15', G: '#22c55e' },
-    pattern: [
-      '...PP.PP....', '..PPPYPPP...', '...PPYPP....', '.....Y......',
-      '.PP..Y..PP..', 'PPPY.Y.YPPP.', '.PP..Y..PP..', '.....G......',
-      '....GGG.....', '...GGGGG....', '....GGG.....', '............',
-    ],
-  },
-  {
-    label: 'としょかんのひと',
-    keywords: ['司書', 'ししょ', '図書館', 'としょかん', '本屋', 'ほんや'],
-    palette: { B: '#6366f1', W: '#f8fafc', Y: '#facc15' },
-    pattern: [
-      '.BBBBB.BBBBB', '.BWWW...WWWB', '.BWWW...WWWB', '.BWWW...WWWB',
-      '.BWWW...WWWB', '.BWWW...WWWB', '.BWWW...WWWB', '.BBBBY.YBBBB',
-      '..BBB...BBB.', '...BB...BB..', '............', '............',
-    ],
-  },
-  {
-    label: 'おんがくか',
-    keywords: ['音楽家', 'おんがくか', '歌手', 'かしゅ', 'ミュージシャン', 'ピアニスト'],
-    palette: { P: '#a855f7', K: '#1f2937' },
-    pattern: [
-      '......PP....', '......PP....', '......PP....', '......PP....',
-      '......PPPP..', '......PP.PP.', '..PP..PP....', '.PPPP.PP....',
-      '.PPPPPPP....', '..PPPPP.....', '............', '............',
-    ],
-  },
-  {
-    label: 'ゆうびんやさん',
-    keywords: ['郵便', 'ゆうびん', '郵便配達', '配達員', 'はいたついん'],
-    palette: { R: '#ef4444', W: '#f8fafc', B: '#2563eb' },
-    pattern: [
-      '.RRRRRRRRRR.', '.RWWWWWWWWR.', '.RRWWWWWWRR.', '.RWRWWWWRWR.',
-      '.RWWRWWRWWR.', '.RWWWRRWWWR.', '.RWWWWWWWWR.', '.RRRRRRRRRR.',
-      '...BBBBBB...', '..BBBBBBBB..', '............', '............',
-    ],
-  },
 ];
 
 const DEFAULT_DREAM_ART = {
@@ -850,13 +753,7 @@ function createKidsElements() {
 
 function getDreamArt(text) {
   const normalized = String(text || '').toLowerCase();
-  const matches = DREAM_ART_LIBRARY.flatMap(art =>
-    art.keywords
-      .filter(keyword => normalized.includes(keyword.toLowerCase()))
-      .map(keyword => ({ art, keywordLength: keyword.length }))
-  );
-  matches.sort((a, b) => b.keywordLength - a.keywordLength);
-  return matches[0]?.art || DEFAULT_DREAM_ART;
+  return DREAM_ART_LIBRARY.find(art => art.keywords.some(keyword => normalized.includes(keyword.toLowerCase()))) || DEFAULT_DREAM_ART;
 }
 
 function dreamArtPixels(art) {
