@@ -225,8 +225,24 @@
   }
   #export-preview-image { display: block; width: 100%; height: auto; box-shadow: 0 8px 28px rgba(0,0,0,0.45); }
   .export-note { margin-top: 12px; color: #aaa; font-size: 12px; }
+  .share-link-panel { margin-top: 14px; padding: 12px; border: 1px solid #444; border-radius: 8px; background: #181818; }
+  .share-link-panel label { margin: 0 0 7px; color: #fff; font-weight: 600; }
+  .share-link-row { display: flex; gap: 8px; }
+  .share-link-row input { flex: 1; min-width: 0; margin: 0; }
+  .share-copy { flex: none; padding: 7px 14px; border: 0; border-radius: 5px; background: #2563eb; color: #fff; cursor: pointer; }
+  .share-hint, .share-status { margin-top: 7px; color: #aaa; font-size: 11px; }
+  .share-status { min-height: 1em; color: #4ade80; }
   .export-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; }
   .export-cancel { padding: 8px 16px; border: 1px solid #555; border-radius: 6px; background: #2b2b2b; color: #ddd; cursor: pointer; }
+  .shared-card-page { display: none; flex: 1; min-height: 100vh; padding: 32px 20px; background: #111827; }
+  body.shared-card-view { height: auto; min-height: 100vh; }
+  body.shared-card-view > header, body.shared-card-view > .main, body.shared-card-view > .export-modal { display: none !important; }
+  body.shared-card-view > .shared-card-page { display: flex; align-items: center; justify-content: center; }
+  .shared-card-content { width: min(960px, 100%); text-align: center; }
+  .shared-card-content h1 { margin-bottom: 8px; color: #fff; font-size: 24px; }
+  .shared-card-content p { margin-bottom: 22px; color: #9ca3af; }
+  .shared-card-image { display: block; width: 100%; height: auto; border-radius: 8px; box-shadow: 0 24px 70px rgba(0,0,0,0.55); }
+  .shared-card-download { display: inline-block; margin-top: 22px; padding: 10px 20px; border-radius: 6px; background: #16a34a; color: #fff; text-decoration: none; }
 </style>
 </head>
 <body>
@@ -353,12 +369,30 @@
       <img id="export-preview-image" alt="完成した名刺のプレビュー">
     </div>
     <p class="export-note">内容を確認し、「画像を保存」からPNG形式で保存できます。</p>
+    <div class="share-link-panel">
+      <label for="export-share-link">共有リンク</label>
+      <div class="share-link-row">
+        <input type="text" id="export-share-link" readonly onclick="this.select()" aria-describedby="share-link-hint share-link-status">
+        <button type="button" class="share-copy" onclick="copyShareLink()">リンクをコピー</button>
+      </div>
+      <p class="share-hint" id="share-link-hint">このリンクを知っている人だけが、完成した名刺を閲覧できます。</p>
+      <p class="share-status" id="share-link-status" aria-live="polite"></p>
+    </div>
     <div class="export-actions">
       <button type="button" class="export-cancel" onclick="closeImageExport()">編集に戻る</button>
       <button type="button" class="export-btn green" onclick="downloadCardImage()">画像を保存（PNG）</button>
     </div>
   </div>
 </div>
+
+<section class="shared-card-page" id="shared-card-page" aria-labelledby="shared-card-title">
+  <div class="shared-card-content">
+    <h1 id="shared-card-title">共有された名刺</h1>
+    <p>共有リンクを受け取った人だけが表示できるページです。</p>
+    <img class="shared-card-image" id="shared-card-image" alt="共有された名刺">
+    <a class="shared-card-download" id="shared-card-download" download="namecard.png">画像を保存</a>
+  </div>
+</section>
 
 <script>
 // ============================================================
@@ -2331,6 +2365,8 @@ function calcNormal(a, b, c) {
 // 完成イメージ表示・PNG保存
 // ============================================================
 const IMAGE_EXPORT_SCALE = 12;
+const SHARE_HASH_PREFIX = '#card=';
+const PNG_DATA_URL_PREFIX = 'data:image/png;base64,';
 let exportedImageDataUrl = '';
 let exportReturnFocus = null;
 
@@ -2343,15 +2379,54 @@ function createCardImageDataUrl() {
   return imageCanvas.toDataURL('image/png');
 }
 
+function createCardShareLink(imageDataUrl) {
+  const base64 = imageDataUrl.slice(PNG_DATA_URL_PREFIX.length);
+  const payload = base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return location.href.split(/[?#]/)[0] + SHARE_HASH_PREFIX + payload;
+}
+
+function sharedCardDataUrlFromHash() {
+  if (!location.hash.startsWith(SHARE_HASH_PREFIX)) return '';
+  const payload = location.hash.slice(SHARE_HASH_PREFIX.length);
+  if (!payload || payload.length > 2000000 || !/^[A-Za-z0-9_-]+$/.test(payload)) return '';
+  const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+  return PNG_DATA_URL_PREFIX + base64 + '='.repeat((4 - base64.length % 4) % 4);
+}
+
+function openSharedCardFromLink() {
+  const imageDataUrl = sharedCardDataUrlFromHash();
+  if (!imageDataUrl) return false;
+  document.body.classList.add('shared-card-view');
+  document.getElementById('shared-card-image').src = imageDataUrl;
+  document.getElementById('shared-card-download').href = imageDataUrl;
+  document.title = '共有された名刺';
+  return true;
+}
+
 function openImageExport() {
   if (!validateRequiredProfile()) return;
   exportedImageDataUrl = createCardImageDataUrl();
   document.getElementById('export-preview-image').src = exportedImageDataUrl;
+  document.getElementById('export-share-link').value = createCardShareLink(exportedImageDataUrl);
+  document.getElementById('share-link-status').textContent = '';
   const modal = document.getElementById('export-modal');
   exportReturnFocus = document.activeElement;
   modal.classList.remove('hidden');
   document.body.style.overflow = 'hidden';
   modal.querySelector('.export-close').focus();
+}
+
+async function copyShareLink() {
+  const input = document.getElementById('export-share-link');
+  const status = document.getElementById('share-link-status');
+  try {
+    await navigator.clipboard.writeText(input.value);
+    status.textContent = 'リンクをコピーしました。';
+  } catch (error) {
+    input.focus();
+    input.select();
+    status.textContent = 'リンクを選択しました。コピーして共有してください。';
+  }
 }
 
 function closeImageExport() {
@@ -2567,6 +2642,7 @@ syncBackgroundDesignButtons();
 renderElementList();
 renderCanvas(true); // 初回は中央に配置
 window.addEventListener('resize', () => centerView());
+openSharedCardFromLink();
 </script>
 </body>
 </html>
