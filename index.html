@@ -18,9 +18,16 @@
     display: flex;
     align-items: center;
     gap: 16px;
+    flex-wrap: wrap;
   }
   header h1 { font-size: 16px; font-weight: 600; color: #fff; }
   header .spacer { flex: 1; }
+  .draft-actions { display: flex; gap: 6px; }
+  .draft-btn { padding: 6px 11px; border: 1px solid #555; border-radius: 5px; background: #2a2a2a; color: #ddd; cursor: pointer; }
+  .draft-btn:hover { border-color: #777; background: #333; }
+  .draft-status { color: #9ca3af; font-size: 11px; }
+  .draft-status.ok { color: #4ade80; }
+  .draft-status.error { color: #f87171; }
   button.export-btn {
     background: #2563eb;
     color: #fff;
@@ -73,7 +80,7 @@
     padding: 2px;
   }
   .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .template-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .template-grid { display: grid; grid-template-columns: 1fr; gap: 8px; }
   .template-btn {
     background: #2a2a2a;
     border: 1px solid #444;
@@ -84,21 +91,7 @@
     cursor: pointer;
   }
   .template-btn:hover { border-color: #666; background: #333; }
-
-  /* フォントドロップゾーン */
-  .font-drop {
-    border: 1px dashed #555;
-    border-radius: 4px;
-    padding: 10px 12px;
-    text-align: center;
-    font-size: 12px;
-    color: #888;
-    cursor: pointer;
-    transition: border-color 0.15s, background 0.15s;
-  }
-  .font-drop:hover, .font-drop.dragover { border-color: #2563eb; background: #1a2a3a; color: #bbb; }
-  .font-status { margin-top: 5px; font-size: 11px; color: #f59e0b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .font-status.loaded { color: #4ade80; }
+  .template-btn.selected { border-color: #2563eb; background: #1e3a5f; }
 
   button.add-btn {
     width: 100%;
@@ -157,6 +150,7 @@
     cursor: default;
     box-shadow: 0 8px 40px rgba(0,0,0,0.6);
     transform-origin: 0 0;
+    touch-action: none;
   }
   .zoom-hint {
     position: absolute;
@@ -243,6 +237,59 @@
   .shared-card-content p { margin-bottom: 22px; color: #9ca3af; }
   .shared-card-image { display: block; width: 100%; height: auto; border-radius: 8px; box-shadow: 0 24px 70px rgba(0,0,0,0.55); }
   .shared-card-download { display: inline-block; margin-top: 22px; padding: 10px 20px; border-radius: 6px; background: #16a34a; color: #fff; text-decoration: none; }
+
+  @media (max-width: 720px) {
+    body:not(.shared-card-view) { height: auto; min-height: 100vh; }
+    body.shared-card-view { width: 100%; min-height: 100dvh; overflow-x: hidden; }
+    body.shared-card-view > .shared-card-page {
+      width: 100%; min-height: 100dvh; padding: 20px 12px max(20px, env(safe-area-inset-bottom));
+      align-items: flex-start;
+    }
+    .shared-card-content { width: 100%; }
+    .shared-card-content h1 { margin-top: 4px; font-size: 20px; }
+    .shared-card-content p { margin-bottom: 16px; font-size: 13px; line-height: 1.6; }
+    .shared-card-image {
+      width: 100%; max-width: 100%; height: auto; border-radius: 6px;
+      box-shadow: 0 12px 36px rgba(0,0,0,0.5);
+    }
+    .shared-card-download {
+      display: inline-flex; width: 100%; min-height: 48px; margin-top: 20px;
+      align-items: center; justify-content: center; font-weight: 600;
+    }
+    header { padding: 10px 12px; gap: 8px; flex-wrap: wrap; }
+    header h1 { flex: 1; font-size: 15px; }
+    header .badge, header .spacer { display: none; }
+    header .draft-actions { order: 3; width: 100%; display: grid; grid-template-columns: repeat(3, 1fr); }
+    header .draft-btn { min-height: 44px; padding: 8px 6px; }
+    header .draft-status { order: 4; width: 100%; }
+    button.export-btn { min-height: 44px; padding: 10px 14px; }
+
+    .main { flex: none; flex-direction: column; overflow: visible; }
+    .canvas-area {
+      order: 1; flex: none; width: 100%; height: min(68vw, 330px); min-height: 240px;
+      border-bottom: 1px solid #333;
+    }
+    .panel { order: 2; width: 100%; overflow: visible; border-right: 0; }
+    .panel-section { padding: 16px; }
+    .element-list, .properties { padding: 16px; }
+
+    input[type="text"], input[type="number"], select,
+    button.add-btn, .template-btn, .background-design-btn, .element-item {
+      min-height: 44px;
+    }
+    input[type="text"], input[type="number"], select { padding: 10px; font-size: 16px; }
+    input[type="color"] { height: 44px; }
+    .question-option { min-height: 44px; padding: 10px; align-items: center; }
+    .question-option input { width: 18px; height: 18px; margin-top: 0; }
+    .element-item .del-btn { min-width: 44px; min-height: 44px; font-size: 18px; }
+    .zoom-hint { right: 8px; bottom: 6px; font-size: 10px; }
+
+    .export-modal { padding: 8px; }
+    .export-dialog { width: 100%; max-height: calc(100dvh - 16px); padding: 14px; }
+    .export-preview-wrap { padding: 10px; }
+    .share-link-row, .export-actions { flex-direction: column; }
+    .share-copy, .export-actions button { width: 100%; min-height: 44px; }
+  }
 </style>
 </head>
 <body>
@@ -250,6 +297,12 @@
 <header>
   <h1>名刺ジェネレーター</h1>
   <span id="font-badge" class="badge">canvasモード（フォント不要）</span>
+  <div class="draft-actions">
+    <button type="button" class="draft-btn" onclick="saveTemporaryDraft()">一時保存</button>
+    <button type="button" class="draft-btn" onclick="restoreTemporaryDraft()">復元</button>
+    <button type="button" class="draft-btn" onclick="clearEditorContent()">内容をクリア</button>
+  </div>
+  <span class="draft-status" id="draft-status" aria-live="polite"></span>
   <div class="spacer"></div>
   <button class="export-btn green" onclick="openImageExport()">エクスポート</button>
 </header>
@@ -260,17 +313,18 @@
     <div class="panel-section">
       <h2>テンプレート</h2>
       <div class="template-grid">
-        <button class="template-btn" onclick="applyTemplate('business')">なまえ + ゆめ</button>
-        <button class="template-btn" onclick="applyTemplate('qr-logo')">ロゴ + QR</button>
+        <button class="template-btn selected" data-grade-mode="lower" onclick="applyTemplate('lower')">小学校 低学年</button>
+        <button class="template-btn" data-grade-mode="middle" onclick="applyTemplate('middle')">小学校 中学年</button>
+        <button class="template-btn" data-grade-mode="upper" onclick="applyTemplate('upper')">小学校 高学年</button>
       </div>
     </div>
 
     <!-- プロフィール入力 -->
     <div class="panel-section">
       <h2>プロフィール入力</h2>
-      <label for="name-input">名前<span class="required-mark">必須</span></label>
+      <label for="name-input"><span id="name-label-text">なまえ</span><span class="required-mark">必須</span></label>
       <input type="text" id="name-input" required aria-required="true" placeholder="例：やまだ たろう" oninput="updateNameFromInput(this.value)">
-      <label for="dream-input">将来の夢<span class="required-mark">必須</span></label>
+      <label for="dream-input"><span id="dream-label-text">しょうらいのゆめ</span><span class="required-mark">必須</span></label>
       <input type="text" id="dream-input" required aria-required="true" placeholder="例：おいしゃさん" oninput="updateDreamFromInput(this.value)">
       <label>追加する質問<span class="required-mark">4つ選択</span></label>
       <div id="question-picker" class="question-picker" tabindex="-1"></div>
@@ -281,11 +335,12 @@
     <!-- フォント -->
     <div class="panel-section">
       <h2>フォント</h2>
-      <div class="font-drop" id="font-drop" onclick="document.getElementById('font-file').click()">
-        TTF / OTF をドロップ or クリック
-        <div class="font-status" id="font-status">未読み込み（バウンディングボックス近似）</div>
-      </div>
-      <input type="file" id="font-file" accept=".ttf,.otf" style="display:none" onchange="onFontFileInput(this)">
+      <label for="font-select">文字の種類</label>
+      <select id="font-select" onchange="applyFontSelection(this.value)">
+        <option value="gothic">ゴシック</option>
+        <option value="rounded">まる文字</option>
+        <option value="mincho">明朝</option>
+      </select>
     </div>
 
     <!-- カード設定 -->
@@ -311,7 +366,7 @@
         </div>
       </div>
       <label>ベースの厚み(mm)</label>
-      <input type="number" id="base-thickness" value="0.8" min="0.2" max="5" step="0.1">
+      <input type="number" id="base-thickness" value="0.8" min="0.2" max="5" step="0.1" oninput="scheduleAutoSave()">
       <label>ベースの色</label>
       <input type="color" id="base-color" value="#ffffff" oninput="renderCanvas()">
     </div>
@@ -322,8 +377,8 @@
       <div id="element-list-container"></div>
       <button class="add-btn" onclick="addElement()">＋ テキストを追加</button>
       <button class="add-btn" onclick="addQRElement()">＋ QRを追加</button>
-      <button class="add-btn" onclick="document.getElementById('photo-file').click()">＋ 写真を追加</button>
-      <input type="file" id="photo-file" accept="image/png,image/jpeg,image/webp,image/svg+xml" style="display:none" onchange="onPhotoFileInput(this)">
+      <button class="add-btn" onclick="document.getElementById('photo-file').click()">＋ 写真・画像を追加</button>
+      <input type="file" id="photo-file" accept="image/*" style="display:none" onchange="onPhotoFileInput(this)">
     </div>
 
     <!-- 選択要素プロパティ -->
@@ -405,6 +460,29 @@ let selectedId = null;
 let dragState = null;
 let loadedFont = null;
 let backgroundDesign = 'plain';
+let selectedFontKey = 'gothic';
+
+const FONT_OPTIONS = {
+  gothic: {
+    label: 'ゴシック',
+    canvas: 'system-ui, sans-serif',
+    svg: 'system-ui, sans-serif',
+  },
+  rounded: {
+    label: 'まる文字',
+    canvas: 'ui-rounded, "Hiragino Maru Gothic ProN", "Arial Rounded MT Bold", sans-serif',
+    svg: 'ui-rounded, Hiragino Maru Gothic ProN, Arial Rounded MT Bold, sans-serif',
+  },
+  mincho: {
+    label: '明朝',
+    canvas: 'ui-serif, "Hiragino Mincho ProN", "Yu Mincho", serif',
+    svg: 'ui-serif, Hiragino Mincho ProN, Yu Mincho, serif',
+  },
+};
+
+function currentFontOption() {
+  return FONT_OPTIONS[selectedFontKey] || FONT_OPTIONS.gothic;
+}
 
 const BACKGROUND_DESIGNS = {
   plain: { label: '無柄・色のみ', baseColor: null, shapes: [] },
@@ -460,6 +538,12 @@ function applyViewTransform() {
 
 function centerView() {
   const aw = canvasArea.clientWidth, ah = canvasArea.clientHeight;
+  if (window.matchMedia('(max-width: 720px)').matches) {
+    const padding = 24;
+    const fitWidth = Math.max(1, aw - padding) / (cardW * PREVIEW_SCALE);
+    const fitHeight = Math.max(1, ah - padding) / (cardH * PREVIEW_SCALE);
+    viewZoom = Math.max(0.2, Math.min(1, fitWidth, fitHeight));
+  }
   viewPanX = (aw - cardW * PREVIEW_SCALE * viewZoom) / 2;
   viewPanY = (ah - cardH * PREVIEW_SCALE * viewZoom) / 2;
   applyViewTransform();
@@ -529,6 +613,86 @@ const DREAM_ART_LIBRARY = [
       '...YYGGYY...', '....YYYY....', '.....YY.....', '............',
     ],
   },
+  {
+    label: 'かいしゃいん',
+    keywords: ['かいしゃいん', '会社員', '会社', 'サラリーマン'],
+    palette: { B: '#3b82f6', W: '#f8fafc', K: '#1f2937' },
+    pattern: [
+      '............', '..BBBBBBBB..', '..BWWWWWWB..', '..BWWWWWWB..',
+      '..BWWWWWWB..', '..BBBBBBBB..', '...KKKKKK...', '..KKKKKKKK..',
+      '....KKKK....', '....KKKK....', '...KKKKKK...', '............',
+    ],
+  },
+  {
+    label: 'どうがクリエイター',
+    keywords: ['youtuber', 'ユーチューバー', 'vtuber', '動画', 'どうが', '配信', 'はいしん'],
+    palette: { R: '#ef4444', W: '#f8fafc', K: '#1f2937' },
+    pattern: [
+      '............', '..RRRRRR....', '.RWWWWWWR...', '.RWWKKWWR.R.',
+      '.RWWKKWWRRR.', '.RWWWWWWR.R.', '.RWWWWWWR...', '..RRRRRR....',
+      '....KK......', '...KKKK.....', '............', '............',
+    ],
+  },
+  {
+    label: 'ゲームクリエイター',
+    keywords: ['ゲームクリエイター', 'ゲーム', 'プログラマー', 'エンジニア', 'it'],
+    palette: { B: '#6366f1', W: '#f8fafc', Y: '#facc15' },
+    pattern: [
+      '............', '...BBBBBB...', '..BBBBBBBB..', '.BBBBBBBBBB.',
+      '.BBBWBBWBBB.', '.BBWWWWWWBB.', '.BBBWBBWBBB.', '.BBBBBBBBBB.',
+      '..BBYBBYBB..', '...BB..BB...', '............', '............',
+    ],
+  },
+  {
+    label: 'せんせい',
+    keywords: ['先生', 'せんせい', '教師', 'きょうし', '教員'],
+    palette: { G: '#22c55e', W: '#f8fafc', Y: '#facc15' },
+    pattern: [
+      '............', '.GGGGGGGGGG.', '.GWWWWWWWWG.', '.GWWYYYYWWG.',
+      '.GWWYYYYWWG.', '.GWWWWWWWWG.', '.GYYYYYYYYG.', '.GWWWWWWWWG.',
+      '.GGGGGGGGGG.', '....GG......', '....GG......', '............',
+    ],
+  },
+  {
+    label: 'けいさつかん',
+    keywords: ['警察官', '警察', 'けいさつ', '公務員', 'こうむいん'],
+    palette: { B: '#2563eb', W: '#f8fafc', Y: '#facc15' },
+    pattern: [
+      '............', '....BBBB....', '..BBBBBBBB..', '.BBBYYYYBBB.',
+      '.BBYYWWYYBB.', '..BYYYYYYB..', '...BYYYYB...', '....BYYB....',
+      '.....BB.....', '.....BB.....', '............', '............',
+    ],
+  },
+  {
+    label: 'ほいくし',
+    keywords: ['保育士', 'ほいくし', '幼稚園', 'ようちえん'],
+    palette: { P: '#f472b6', Y: '#facc15', B: '#60a5fa', W: '#f8fafc' },
+    pattern: [
+      '............', '..PP....PP..', '.PWWP..PWWP.', '.PWWPPPPWWP.',
+      '..PWWWWWWP..', '...PWWWWP...', '....PWWP....', '.....PP.....',
+      '..YY..BBBB..', '..YY..BBBB..', '............', '............',
+    ],
+  },
+  {
+    label: 'びようし',
+    keywords: ['美容師', 'びようし', 'ヘアメイク'],
+    palette: { P: '#ec4899', K: '#1f2937', W: '#f8fafc' },
+    pattern: [
+      '.PP......PP.', '..PP....PP..', '...PP..PP...', '....PPPP....',
+      '.....PP.....', '....PWWP....', '...PWWWWP...', '..KKPWWPKK..',
+      '.KK..PP..KK.', 'KK........KK', '............', '............',
+    ],
+  },
+  {
+    label: 'けんきゅうしゃ',
+    keywords: ['研究者', 'けんきゅう', '科学者', 'かがく', '薬剤師', 'やくざいし'],
+    palette: { B: '#38bdf8', W: '#f8fafc', P: '#a855f7' },
+    pattern: [
+      '....WWWW....', '.....WW.....', '.....WW.....', '....WBBW....',
+      '...WBBBBW...', '..WBBBBBBW..', '..WBBPPBBW..', '.WBBPPPPBBW.',
+      '.WBBBBBBBBW.', '..WWWWWWWW..', '............', '............',
+    ],
+  },
 ];
 
 const DEFAULT_DREAM_ART = {
@@ -542,23 +706,43 @@ const DEFAULT_DREAM_ART = {
   ],
 };
 
+const GRADE_MODES = {
+  lower: {
+    nameLabel: 'なまえ', namePrefix: 'なまえ',
+    dreamLabel: 'しょうらいのゆめ', dreamPrefix: 'しょうらいのゆめ',
+    answerPlaceholder: 'こたえを かいてね',
+  },
+  middle: {
+    nameLabel: '名前', namePrefix: '名前',
+    dreamLabel: 'しょうらいの夢', dreamPrefix: 'しょうらいの夢',
+    answerPlaceholder: '答えを 入力',
+  },
+  upper: {
+    nameLabel: '名前', namePrefix: '名前',
+    dreamLabel: '将来の夢', dreamPrefix: '将来の夢',
+    answerPlaceholder: '回答を入力',
+  },
+};
+let gradeMode = 'lower';
+
 const PROFILE_QUESTIONS = [
-  { key: 'interest', label: '今ハマっていること' },
-  { key: 'million', label: '100万円あったら何する？' },
-  { key: 'island', label: '無人島に何か持って行くなら？' },
-  { key: 'admire', label: '憧れの人は？' },
-  { key: 'once', label: '人生で一度はやってみたいことは？' },
-  { key: 'country', label: '行きたい国は？' },
-  { key: 'food', label: '好きな料理は？' },
+  { key: 'interest', labels: { lower: 'いま はまっていること', middle: '今 はまっていること', upper: '今ハマっていること' } },
+  { key: 'million', labels: { lower: '100まんえん あったら なにする？', middle: '100万円あったら 何する？', upper: '100万円あったら何する？' } },
+  { key: 'island', labels: { lower: 'むじんとうに なにか もっていくなら？', middle: '無人島に 何か もっていくなら？', upper: '無人島に何か持って行くなら？' } },
+  { key: 'admire', labels: { lower: 'あこがれの ひとは？', middle: 'あこがれの人は？', upper: '憧れの人は？' } },
+  { key: 'once', labels: { lower: 'いちどは やってみたいことは？', middle: '一度は やってみたいことは？', upper: '人生で一度はやってみたいことは？' } },
+  { key: 'country', labels: { lower: 'いきたい くには？', middle: '行きたい 国は？', upper: '行きたい国は？' } },
+  { key: 'food', labels: { lower: 'すきな りょうりは？', middle: '好きな 料理は？', upper: '好きな料理は？' } },
 ];
 const REQUIRED_QUESTION_COUNT = 4;
 let selectedQuestionKeys = [];
 let questionAnswers = {};
 
 function createKidsElements() {
-  const dream = { id: uid(), role: 'dream', type: 'text', text: 'しょうらいのゆめ：', x: 6, y: 19, size: 7, bold: true, color: '#2563eb', extrude: 0.4 };
+  const mode = currentGradeMode();
+  const dream = { id: uid(), role: 'dream', type: 'text', text: `${mode.dreamPrefix}：`, x: 6, y: 19, size: 7, bold: true, color: '#2563eb', extrude: 0.4 };
   return [
-    { id: uid(), role: 'name', type: 'text', text: 'なまえ：', x: 6, y: 10, size: 12, bold: true, color: '#111111', extrude: 0.5 },
+    { id: uid(), role: 'name', type: 'text', text: `${mode.namePrefix}：`, x: 6, y: 10, size: 12, bold: true, color: '#111111', extrude: 0.5 },
     dream,
     createDreamIllustrationElement(dream.text),
   ];
@@ -596,11 +780,32 @@ function syncDreamIllustration() {
 }
 
 function dreamAnswer(text) {
-  return String(text || '').replace(/^しょうらいのゆめ[：:]\s*/, '');
+  return String(text || '').replace(/^(?:しょうらいのゆめ|しょうらいの夢|将来の夢)[：:]\s*/, '');
 }
 
 function nameAnswer(text) {
-  return String(text || '').replace(/^なまえ[：:]\s*/, '');
+  return String(text || '').replace(/^(?:なまえ|名前)[：:]\s*/, '');
+}
+
+function currentGradeMode() {
+  return GRADE_MODES[gradeMode] || GRADE_MODES.lower;
+}
+
+function questionLabel(question) {
+  return question.labels[gradeMode] || question.labels.upper;
+}
+
+function syncGradeModeUI() {
+  const mode = currentGradeMode();
+  document.querySelectorAll('.template-btn[data-grade-mode]').forEach(button => {
+    const selected = button.dataset.gradeMode === gradeMode;
+    button.classList.toggle('selected', selected);
+    button.setAttribute('aria-pressed', String(selected));
+  });
+  document.getElementById('name-label-text').textContent = mode.nameLabel;
+  document.getElementById('dream-label-text').textContent = mode.dreamLabel;
+  document.getElementById('name-input').placeholder = gradeMode === 'lower' ? '例：ゆうき' : '例：ゆうき';
+  document.getElementById('dream-input').placeholder = gradeMode === 'lower' ? '例：おいしゃさん' : '例：医者';
 }
 
 function syncNameInput() {
@@ -625,7 +830,7 @@ function updateNameFromInput(value) {
   const name = elements.find(el => el.role === 'name');
   if (!name) return;
   document.getElementById('name-input').setCustomValidity('');
-  name.text = `なまえ：${value}`;
+  name.text = `${currentGradeMode().namePrefix}：${value}`;
   if (selectedId === name.id) document.getElementById('prop-text').value = name.text;
   renderElementList();
   renderCanvas();
@@ -635,7 +840,7 @@ function updateDreamFromInput(value) {
   const dream = elements.find(el => el.role === 'dream');
   if (!dream) return;
   document.getElementById('dream-input').setCustomValidity('');
-  dream.text = `しょうらいのゆめ：${value}`;
+  dream.text = `${currentGradeMode().dreamPrefix}：${value}`;
   syncDreamIllustration();
   if (selectedId === dream.id) document.getElementById('prop-text').value = dream.text;
   renderElementList();
@@ -657,7 +862,7 @@ function syncQuestionElements() {
     const previous = existing.get(key);
     elements.push({
       id: previous?.id || uid(), role: 'profile-question', questionKey: key, type: 'text',
-      text: `${question.label}：${questionAnswers[key] || ''}`,
+      text: `${questionLabel(question)}：${questionAnswers[key] || ''}`,
       x: previous?.x ?? 6, y: previous?.y ?? 28 + index * 6.5,
       size: previous?.size ?? 5, bold: previous?.bold ?? true,
       color: previous?.color || '#444444', extrude: previous?.extrude ?? 0.3,
@@ -689,7 +894,7 @@ function renderQuestionPicker() {
     checkbox.disabled = !profileActive || (!checked && selectedQuestionKeys.length >= REQUIRED_QUESTION_COUNT);
     checkbox.addEventListener('change', () => toggleProfileQuestion(question.key, checkbox.checked));
     const text = document.createElement('span');
-    text.textContent = question.label;
+    text.textContent = questionLabel(question);
     option.append(checkbox, text);
     picker.appendChild(option);
   }
@@ -699,13 +904,13 @@ function renderQuestionPicker() {
     if (!question) continue;
     const label = document.createElement('label');
     label.htmlFor = `question-answer-${key}`;
-    label.innerHTML = `${escHtml(question.label)}<span class="required-mark">必須</span>`;
+    label.innerHTML = `${escHtml(questionLabel(question))}<span class="required-mark">必須</span>`;
     const input = document.createElement('input');
     input.type = 'text';
     input.id = `question-answer-${key}`;
     input.required = true;
     input.disabled = !profileActive;
-    input.placeholder = '回答を入力';
+    input.placeholder = currentGradeMode().answerPlaceholder;
     input.value = questionAnswers[key] || '';
     input.addEventListener('input', () => updateQuestionAnswer(key, input.value));
     answers.append(label, input);
@@ -735,7 +940,7 @@ function updateQuestionAnswer(key, value) {
   if (input) input.setCustomValidity('');
   const question = questionDefinition(key);
   const element = elements.find(el => el.role === 'profile-question' && el.questionKey === key);
-  if (question && element) element.text = `${question.label}：${value}`;
+  if (question && element) element.text = `${questionLabel(question)}：${value}`;
   if (selectedId === element?.id) document.getElementById('prop-text').value = element.text;
   renderElementList();
   renderCanvas();
@@ -763,47 +968,166 @@ function validateRequiredProfile() {
   for (const key of selectedQuestionKeys) {
     const question = questionDefinition(key);
     const input = document.getElementById(`question-answer-${key}`);
-    input.setCustomValidity(input.value.trim() ? '' : `${question.label}の回答を入力してください。`);
+    input.setCustomValidity(input.value.trim() ? '' : `${questionLabel(question)}の回答を入力してください。`);
     if (!input.reportValidity()) return false;
   }
   return true;
+}
+
+// ============================================================
+// ブラウザ内の一時保存
+// ============================================================
+const DRAFT_STORAGE_KEY = 'namecard-generator:draft:v1';
+let autoSaveEnabled = false;
+let autoSaveTimer = null;
+
+function setDraftStatus(message, type = '') {
+  const status = document.getElementById('draft-status');
+  status.textContent = message;
+  status.className = `draft-status${type ? ` ${type}` : ''}`;
+}
+
+function createDraftSnapshot() {
+  return {
+    version: 1,
+    savedAt: new Date().toISOString(),
+    elements: elements.map(({ sourceImage, ...element }) => element),
+    selectedQuestionKeys,
+    questionAnswers,
+    backgroundDesign,
+    selectedFontKey,
+    gradeMode,
+    cardSize: document.getElementById('card-size').value,
+    cardW: +document.getElementById('card-w').value || cardW,
+    cardH: +document.getElementById('card-h').value || cardH,
+    baseColor: document.getElementById('base-color').value,
+    baseThickness: document.getElementById('base-thickness').value,
+  };
+}
+
+function persistDraft(showStatus = false) {
+  try {
+    const draft = createDraftSnapshot();
+    localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
+    if (showStatus) {
+      const savedTime = new Date(draft.savedAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+      setDraftStatus(`${savedTime} に保存しました`, 'ok');
+    }
+    return true;
+  } catch (error) {
+    console.error(error);
+    setDraftStatus('保存できませんでした', 'error');
+    return false;
+  }
+}
+
+function saveTemporaryDraft() {
+  persistDraft(true);
+}
+
+function scheduleAutoSave() {
+  if (!autoSaveEnabled) return;
+  clearTimeout(autoSaveTimer);
+  autoSaveTimer = setTimeout(() => persistDraft(false), 300);
+}
+
+function restoreTemporaryDraft({ automatic = false } = {}) {
+  try {
+    const stored = localStorage.getItem(DRAFT_STORAGE_KEY);
+    if (!stored) {
+      if (!automatic) setDraftStatus('保存データがありません', 'error');
+      return false;
+    }
+    const draft = JSON.parse(stored);
+    if (draft?.version !== 1 || !Array.isArray(draft.elements)) throw new Error('保存データの形式が正しくありません');
+
+    elements = draft.elements.filter(element => element && typeof element === 'object').map(element => ({ ...element, id: element.id || uid() }));
+    restorePhotoSourceImages();
+    selectedQuestionKeys = Array.isArray(draft.selectedQuestionKeys)
+      ? draft.selectedQuestionKeys.filter(key => PROFILE_QUESTIONS.some(question => question.key === key)).slice(0, REQUIRED_QUESTION_COUNT)
+      : [];
+    questionAnswers = draft.questionAnswers && typeof draft.questionAnswers === 'object' ? { ...draft.questionAnswers } : {};
+    backgroundDesign = BACKGROUND_DESIGNS[draft.backgroundDesign] ? draft.backgroundDesign : 'plain';
+    selectedFontKey = FONT_OPTIONS[draft.selectedFontKey] ? draft.selectedFontKey : 'gothic';
+    gradeMode = GRADE_MODES[draft.gradeMode] ? draft.gradeMode : 'lower';
+
+    const width = Number(draft.cardW);
+    const height = Number(draft.cardH);
+    document.getElementById('card-w').value = Number.isFinite(width) && width >= 10 && width <= 200 ? width : 91;
+    document.getElementById('card-h').value = Number.isFinite(height) && height >= 10 && height <= 200 ? height : 55;
+    const cardSize = ['91x55', '89x51', 'custom'].includes(draft.cardSize) ? draft.cardSize : '91x55';
+    document.getElementById('card-size').value = cardSize;
+    document.getElementById('custom-size').style.display = cardSize === 'custom' ? '' : 'none';
+    if (/^#[0-9a-f]{6}$/i.test(draft.baseColor || '')) document.getElementById('base-color').value = draft.baseColor;
+    document.getElementById('base-thickness').value = draft.baseThickness || '0.8';
+    document.getElementById('font-select').value = selectedFontKey;
+    const badge = document.getElementById('font-badge');
+    badge.textContent = currentFontOption().label;
+    badge.className = 'badge ok';
+
+    selectedId = null;
+    document.getElementById('properties-panel').classList.add('hidden');
+    syncGradeModeUI();
+    syncNameInput();
+    syncDreamInput();
+    syncBackgroundDesignButtons();
+    renderQuestionPicker();
+    renderElementList();
+    renderCanvas(true);
+    setDraftStatus(automatic ? '前回の内容を自動復元しました' : '保存内容を復元しました', 'ok');
+    return true;
+  } catch (error) {
+    console.error(error);
+    setDraftStatus('保存データを復元できませんでした', 'error');
+    return false;
+  }
+}
+
+function clearEditorContent() {
+  if (!confirm('入力内容と保存内容をすべてクリアしますか？')) return;
+  clearTimeout(autoSaveTimer);
+  localStorage.removeItem(DRAFT_STORAGE_KEY);
+  selectedId = null;
+  selectedQuestionKeys = [];
+  questionAnswers = {};
+  backgroundDesign = 'plain';
+  selectedFontKey = 'gothic';
+  gradeMode = 'lower';
+  elements = createKidsElements();
+  document.getElementById('properties-panel').classList.add('hidden');
+  document.getElementById('card-size').value = '91x55';
+  document.getElementById('card-w').value = 91;
+  document.getElementById('card-h').value = 55;
+  document.getElementById('custom-size').style.display = 'none';
+  document.getElementById('base-color').value = '#ffffff';
+  document.getElementById('base-thickness').value = '0.8';
+  document.getElementById('font-select').value = selectedFontKey;
+  document.getElementById('font-badge').textContent = currentFontOption().label;
+  syncGradeModeUI();
+  syncNameInput();
+  syncDreamInput();
+  syncBackgroundDesignButtons();
+  renderQuestionPicker();
+  renderElementList();
+  renderCanvas(true);
+  persistDraft(false);
+  setDraftStatus('内容をクリアしました', 'ok');
 }
 
 elements = createKidsElements();
 renderQuestionPicker();
 
 // ============================================================
-// フォント読み込み
+// フォント選択
 // ============================================================
-async function onFontFileInput(input) {
-  if (!input.files[0]) return;
-  await loadFontFromFile(input.files[0]);
+function applyFontSelection(key) {
+  selectedFontKey = FONT_OPTIONS[key] ? key : 'gothic';
+  document.getElementById('font-select').value = selectedFontKey;
+  const badge = document.getElementById('font-badge');
+  badge.textContent = currentFontOption().label;
+  badge.className = 'badge ok';
+  renderCanvas();
 }
-
-async function loadFontFromFile(file) {
-  try {
-    const buffer = await file.arrayBuffer();
-    loadedFont = opentype.parse(buffer);
-    const statusEl = document.getElementById('font-status');
-    statusEl.textContent = file.name;
-    statusEl.className = 'font-status loaded';
-    const badge = document.getElementById('font-badge');
-    badge.textContent = 'フォント読込済';
-    badge.className = 'badge ok';
-  } catch(e) {
-    alert('フォントの読み込みに失敗しました: ' + e.message);
-  }
-}
-
-const fontDrop = document.getElementById('font-drop');
-fontDrop.addEventListener('dragover', e => { e.preventDefault(); fontDrop.classList.add('dragover'); });
-fontDrop.addEventListener('dragleave', () => fontDrop.classList.remove('dragover'));
-fontDrop.addEventListener('drop', async e => {
-  e.preventDefault();
-  fontDrop.classList.remove('dragover');
-  const file = e.dataTransfer.files[0];
-  if (file) await loadFontFromFile(file);
-});
 
 // ============================================================
 // 背景デザイン
@@ -853,7 +1177,8 @@ function onCardSizeChange() {
   }
 }
 
-function applyTemplate(name) {
+function applyTemplate(mode = 'lower') {
+  gradeMode = GRADE_MODES[mode] ? mode : 'lower';
   selectedId = null;
   selectedQuestionKeys = [];
   questionAnswers = {};
@@ -861,15 +1186,9 @@ function applyTemplate(name) {
   document.getElementById('properties-panel').classList.add('hidden');
   document.getElementById('base-color').value = '#ffffff';
 
-  if (name === 'qr-logo') {
-    elements = [
-      { id: uid(), type: 'text', text: 'LOGO', x: 8, y: 25, size: 22, bold: true, color: '#111111', extrude: 0.6 },
-      { id: uid(), type: 'qr', text: 'https://example.com', x: 56, y: 11, size: 33, bold: true, color: '#111111', extrude: 0.5 },
-    ];
-  } else {
-    elements = createKidsElements();
-  }
+  elements = createKidsElements();
 
+  syncGradeModeUI();
   syncNameInput();
   syncDreamInput();
   syncBackgroundDesignButtons();
@@ -896,7 +1215,7 @@ function drawCardContent(targetCtx, scale) {
       drawImageElement(targetCtx, el, scale);
     } else {
       const px = el.size * scale * 0.353;
-      targetCtx.font = `${el.bold ? 'bold ' : ''}${px}px system-ui, sans-serif`;
+      targetCtx.font = `${el.bold ? 'bold ' : ''}${px}px ${currentFontOption().canvas}`;
       targetCtx.fillStyle = el.color;
       targetCtx.fillText(el.text, el.x * scale, el.y * scale);
     }
@@ -946,13 +1265,14 @@ function renderCanvas(recenter = false) {
         ctx.strokeRect(el.x * renderScale - 2 * dpr, el.y * renderScale - 2 * dpr, el.size * renderScale + 4 * dpr, h * renderScale + 4 * dpr);
       } else {
         const px = el.size * renderScale * 0.353;
-        ctx.font = `${el.bold ? 'bold ' : ''}${px}px system-ui, sans-serif`;
+        ctx.font = `${el.bold ? 'bold ' : ''}${px}px ${currentFontOption().canvas}`;
         const w = ctx.measureText(el.text).width;
         ctx.strokeRect(el.x * renderScale - 2 * dpr, el.y * renderScale - px - 1 * dpr, w + 4 * dpr, px + 5 * dpr);
       }
       ctx.setLineDash([]);
     }
   }
+  scheduleAutoSave();
 }
 
 function drawQRElement(targetCtx, el, scale) {
@@ -969,6 +1289,15 @@ function drawQRElement(targetCtx, el, scale) {
 }
 
 function drawImageElement(targetCtx, el, scale) {
+  if (el.role === 'photo' && el.sourceImage) {
+    const displayHeight = getElementHeight(el);
+    targetCtx.save();
+    targetCtx.imageSmoothingEnabled = true;
+    targetCtx.imageSmoothingQuality = 'high';
+    targetCtx.drawImage(el.sourceImage, el.x * scale, el.y * scale, el.size * scale, displayHeight * scale);
+    targetCtx.restore();
+    return;
+  }
   if (!el.pixels || !el.gridW || !el.gridH) return;
   const cell = el.size * scale / el.gridW;
   for (const p of el.pixels) {
@@ -1399,8 +1728,9 @@ function updateSelectedProp(key, value) {
   }
   if (key === 'text' && el.role === 'profile-question') {
     const question = questionDefinition(el.questionKey);
-    questionAnswers[el.questionKey] = question && value.startsWith(`${question.label}：`)
-      ? value.slice(question.label.length + 1)
+    const label = question ? questionLabel(question) : '';
+    questionAnswers[el.questionKey] = question && value.startsWith(`${label}：`)
+      ? value.slice(label.length + 1)
       : value;
     renderQuestionPicker();
   }
@@ -1451,6 +1781,15 @@ async function onPhotoFileInput(input) {
 
 async function rasterFileToPhotoElement(file) {
   const image = await loadLocalImage(file);
+  const sourceScale = Math.min(1, 800 / Math.max(image.naturalWidth, image.naturalHeight));
+  const sourceCanvas = document.createElement('canvas');
+  sourceCanvas.width = Math.max(1, Math.round(image.naturalWidth * sourceScale));
+  sourceCanvas.height = Math.max(1, Math.round(image.naturalHeight * sourceScale));
+  const sourceCtx = sourceCanvas.getContext('2d');
+  sourceCtx.imageSmoothingEnabled = true;
+  sourceCtx.imageSmoothingQuality = 'high';
+  sourceCtx.drawImage(image, 0, 0, sourceCanvas.width, sourceCanvas.height);
+  const sourceDataUrl = sourceCanvas.toDataURL('image/webp', 0.84);
   const targetCells = 32;
   const scale = targetCells / Math.max(image.naturalWidth, image.naturalHeight);
   const gridW = Math.max(1, Math.round(image.naturalWidth * scale));
@@ -1475,9 +1814,20 @@ async function rasterFileToPhotoElement(file) {
   return {
     id: uid(), role: 'photo', type: 'image', text: file.name,
     x: Math.max(2, cardW - displayWidth - 4), y: 4, size: displayWidth,
-    gridW, gridH, pixels, vectorGroups: [], bold: true,
+    gridW, gridH, pixels, sourceImage: image, sourceDataUrl, vectorGroups: [], bold: true,
     color: pixels[0]?.color || '#111111', extrude: 0.3,
   };
+}
+
+function restorePhotoSourceImages() {
+  for (const element of elements.filter(el => el.role === 'photo' && el.sourceDataUrl)) {
+    const image = new Image();
+    image.onload = () => {
+      element.sourceImage = image;
+      renderCanvas();
+    };
+    image.src = element.sourceDataUrl;
+  }
 }
 
 function loadLocalImage(file) {
@@ -1536,8 +1886,9 @@ function deleteElement(id) {
 // ============================================================
 // 要素ドラッグ & ビューパン
 // ============================================================
-canvas.addEventListener('mousedown', e => {
+canvas.addEventListener('pointerdown', e => {
   if (e.button !== 0) return;
+  e.preventDefault();
   const { x: mx, y: my } = clientToMM(e.clientX, e.clientY);
 
   let hit = null;
@@ -1548,7 +1899,7 @@ canvas.addEventListener('mousedown', e => {
       inside = mx >= el.x - 1 && mx <= el.x + el.size + 1 && my >= el.y - 1 && my <= el.y + getElementHeight(el) + 1;
     } else {
       const px = el.size * renderScale * 0.353;
-      ctx.font = `${el.bold ? 'bold ' : ''}${px}px system-ui, sans-serif`;
+      ctx.font = `${el.bold ? 'bold ' : ''}${px}px ${currentFontOption().canvas}`;
       const w = ctx.measureText(el.text).width / renderScale;
       const h = el.size * 0.353;
       inside = mx >= el.x - 1 && mx <= el.x + w + 1 && my >= el.y - h - 1 && my <= el.y + 2;
@@ -1569,7 +1920,7 @@ canvas.addEventListener('mousedown', e => {
   }
 });
 
-window.addEventListener('mousemove', e => {
+window.addEventListener('pointermove', e => {
   if (dragState) {
     const { x: mx, y: my } = clientToMM(e.clientX, e.clientY);
     const el = elements.find(el => el.id === dragState.id);
@@ -1590,7 +1941,7 @@ window.addEventListener('mousemove', e => {
   }
 });
 
-window.addEventListener('mouseup', e => {
+function finishPointerInteraction() {
   if (dragState) {
     dragState = null;
     canvas.style.cursor = 'default';
@@ -1605,7 +1956,10 @@ window.addEventListener('mouseup', e => {
     panState = null;
     canvas.style.cursor = 'default';
   }
-});
+}
+
+window.addEventListener('pointerup', finishPointerInteraction);
+window.addEventListener('pointercancel', finishPointerInteraction);
 
 // ホイール: ズーム（マウス位置固定）
 canvasArea.addEventListener('wheel', e => {
@@ -1971,7 +2325,7 @@ function makeTextRasterMask(el, useLoadedFont = !!loadedFont, pxPerMM = 80) {
     tc.fillStyle = 'white';
     tc.fill('evenodd');
   } else {
-    const fontStr = `${el.bold ? 'bold ' : ''}${fontPx}px system-ui, sans-serif`;
+    const fontStr = `${el.bold ? 'bold ' : ''}${fontPx}px ${currentFontOption().canvas}`;
     tc.font = fontStr;
     const met = tc.measureText(el.text);
 
@@ -2229,7 +2583,7 @@ function exportSVG() {
       } else {
         // <text> 要素（システムフォント依存だが完全ベクター）
         const bold = el.bold ? ' font-weight="bold"' : '';
-        lines.push(`  <text x="${el.x}" y="${el.y}" font-size="${fontSize}"${bold} fill="${el.color}" font-family="system-ui, sans-serif">${escSvg(el.text)}</text>`);
+        lines.push(`  <text x="${el.x}" y="${el.y}" font-size="${fontSize}"${bold} fill="${el.color}" font-family="${currentFontOption().svg}">${escSvg(el.text)}</text>`);
       }
     }
 
@@ -2629,11 +2983,19 @@ function downloadBlob(data, filename, mime) {
 // ============================================================
 // 初期化
 // ============================================================
+document.getElementById('font-select').value = selectedFontKey;
+document.getElementById('font-badge').textContent = currentFontOption().label;
+document.getElementById('font-badge').className = 'badge ok';
 syncBackgroundDesignButtons();
 renderElementList();
 renderCanvas(true); // 初回は中央に配置
 window.addEventListener('resize', () => centerView());
-openSharedCardFromLink();
+const isSharedCardView = openSharedCardFromLink();
+if (!isSharedCardView) {
+  restoreTemporaryDraft({ automatic: true });
+  autoSaveEnabled = true;
+  scheduleAutoSave();
+}
 </script>
 </body>
 </html>
