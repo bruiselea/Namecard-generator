@@ -91,6 +91,7 @@
     cursor: pointer;
   }
   .template-btn:hover { border-color: #666; background: #333; }
+  .template-btn.selected { border-color: #2563eb; background: #1e3a5f; }
 
   button.add-btn {
     width: 100%;
@@ -312,16 +313,18 @@
     <div class="panel-section">
       <h2>テンプレート</h2>
       <div class="template-grid">
-        <button class="template-btn" onclick="applyTemplate()">なまえ + ゆめ</button>
+        <button class="template-btn selected" data-grade-mode="lower" onclick="applyTemplate('lower')">小学校 低学年</button>
+        <button class="template-btn" data-grade-mode="middle" onclick="applyTemplate('middle')">小学校 中学年</button>
+        <button class="template-btn" data-grade-mode="upper" onclick="applyTemplate('upper')">小学校 高学年</button>
       </div>
     </div>
 
     <!-- プロフィール入力 -->
     <div class="panel-section">
       <h2>プロフィール入力</h2>
-      <label for="name-input">名前<span class="required-mark">必須</span></label>
+      <label for="name-input"><span id="name-label-text">なまえ</span><span class="required-mark">必須</span></label>
       <input type="text" id="name-input" required aria-required="true" placeholder="例：やまだ たろう" oninput="updateNameFromInput(this.value)">
-      <label for="dream-input">将来の夢<span class="required-mark">必須</span></label>
+      <label for="dream-input"><span id="dream-label-text">しょうらいのゆめ</span><span class="required-mark">必須</span></label>
       <input type="text" id="dream-input" required aria-required="true" placeholder="例：おいしゃさん" oninput="updateDreamFromInput(this.value)">
       <label>追加する質問<span class="required-mark">4つ選択</span></label>
       <div id="question-picker" class="question-picker" tabindex="-1"></div>
@@ -610,6 +613,86 @@ const DREAM_ART_LIBRARY = [
       '...YYGGYY...', '....YYYY....', '.....YY.....', '............',
     ],
   },
+  {
+    label: 'かいしゃいん',
+    keywords: ['かいしゃいん', '会社員', '会社', 'サラリーマン'],
+    palette: { B: '#3b82f6', W: '#f8fafc', K: '#1f2937' },
+    pattern: [
+      '............', '..BBBBBBBB..', '..BWWWWWWB..', '..BWWWWWWB..',
+      '..BWWWWWWB..', '..BBBBBBBB..', '...KKKKKK...', '..KKKKKKKK..',
+      '....KKKK....', '....KKKK....', '...KKKKKK...', '............',
+    ],
+  },
+  {
+    label: 'どうがクリエイター',
+    keywords: ['youtuber', 'ユーチューバー', 'vtuber', '動画', 'どうが', '配信', 'はいしん'],
+    palette: { R: '#ef4444', W: '#f8fafc', K: '#1f2937' },
+    pattern: [
+      '............', '..RRRRRR....', '.RWWWWWWR...', '.RWWKKWWR.R.',
+      '.RWWKKWWRRR.', '.RWWWWWWR.R.', '.RWWWWWWR...', '..RRRRRR....',
+      '....KK......', '...KKKK.....', '............', '............',
+    ],
+  },
+  {
+    label: 'ゲームクリエイター',
+    keywords: ['ゲームクリエイター', 'ゲーム', 'プログラマー', 'エンジニア', 'it'],
+    palette: { B: '#6366f1', W: '#f8fafc', Y: '#facc15' },
+    pattern: [
+      '............', '...BBBBBB...', '..BBBBBBBB..', '.BBBBBBBBBB.',
+      '.BBBWBBWBBB.', '.BBWWWWWWBB.', '.BBBWBBWBBB.', '.BBBBBBBBBB.',
+      '..BBYBBYBB..', '...BB..BB...', '............', '............',
+    ],
+  },
+  {
+    label: 'せんせい',
+    keywords: ['先生', 'せんせい', '教師', 'きょうし', '教員'],
+    palette: { G: '#22c55e', W: '#f8fafc', Y: '#facc15' },
+    pattern: [
+      '............', '.GGGGGGGGGG.', '.GWWWWWWWWG.', '.GWWYYYYWWG.',
+      '.GWWYYYYWWG.', '.GWWWWWWWWG.', '.GYYYYYYYYG.', '.GWWWWWWWWG.',
+      '.GGGGGGGGGG.', '....GG......', '....GG......', '............',
+    ],
+  },
+  {
+    label: 'けいさつかん',
+    keywords: ['警察官', '警察', 'けいさつ', '公務員', 'こうむいん'],
+    palette: { B: '#2563eb', W: '#f8fafc', Y: '#facc15' },
+    pattern: [
+      '............', '....BBBB....', '..BBBBBBBB..', '.BBBYYYYBBB.',
+      '.BBYYWWYYBB.', '..BYYYYYYB..', '...BYYYYB...', '....BYYB....',
+      '.....BB.....', '.....BB.....', '............', '............',
+    ],
+  },
+  {
+    label: 'ほいくし',
+    keywords: ['保育士', 'ほいくし', '幼稚園', 'ようちえん'],
+    palette: { P: '#f472b6', Y: '#facc15', B: '#60a5fa', W: '#f8fafc' },
+    pattern: [
+      '............', '..PP....PP..', '.PWWP..PWWP.', '.PWWPPPPWWP.',
+      '..PWWWWWWP..', '...PWWWWP...', '....PWWP....', '.....PP.....',
+      '..YY..BBBB..', '..YY..BBBB..', '............', '............',
+    ],
+  },
+  {
+    label: 'びようし',
+    keywords: ['美容師', 'びようし', 'ヘアメイク'],
+    palette: { P: '#ec4899', K: '#1f2937', W: '#f8fafc' },
+    pattern: [
+      '.PP......PP.', '..PP....PP..', '...PP..PP...', '....PPPP....',
+      '.....PP.....', '....PWWP....', '...PWWWWP...', '..KKPWWPKK..',
+      '.KK..PP..KK.', 'KK........KK', '............', '............',
+    ],
+  },
+  {
+    label: 'けんきゅうしゃ',
+    keywords: ['研究者', 'けんきゅう', '科学者', 'かがく', '薬剤師', 'やくざいし'],
+    palette: { B: '#38bdf8', W: '#f8fafc', P: '#a855f7' },
+    pattern: [
+      '....WWWW....', '.....WW.....', '.....WW.....', '....WBBW....',
+      '...WBBBBW...', '..WBBBBBBW..', '..WBBPPBBW..', '.WBBPPPPBBW.',
+      '.WBBBBBBBBW.', '..WWWWWWWW..', '............', '............',
+    ],
+  },
 ];
 
 const DEFAULT_DREAM_ART = {
@@ -623,23 +706,43 @@ const DEFAULT_DREAM_ART = {
   ],
 };
 
+const GRADE_MODES = {
+  lower: {
+    nameLabel: 'なまえ', namePrefix: 'なまえ',
+    dreamLabel: 'しょうらいのゆめ', dreamPrefix: 'しょうらいのゆめ',
+    answerPlaceholder: 'こたえを かいてね',
+  },
+  middle: {
+    nameLabel: '名前', namePrefix: '名前',
+    dreamLabel: 'しょうらいの夢', dreamPrefix: 'しょうらいの夢',
+    answerPlaceholder: '答えを 入力',
+  },
+  upper: {
+    nameLabel: '名前', namePrefix: '名前',
+    dreamLabel: '将来の夢', dreamPrefix: '将来の夢',
+    answerPlaceholder: '回答を入力',
+  },
+};
+let gradeMode = 'lower';
+
 const PROFILE_QUESTIONS = [
-  { key: 'interest', label: '今ハマっていること' },
-  { key: 'million', label: '100万円あったら何する？' },
-  { key: 'island', label: '無人島に何か持って行くなら？' },
-  { key: 'admire', label: '憧れの人は？' },
-  { key: 'once', label: '人生で一度はやってみたいことは？' },
-  { key: 'country', label: '行きたい国は？' },
-  { key: 'food', label: '好きな料理は？' },
+  { key: 'interest', labels: { lower: 'いま はまっていること', middle: '今 はまっていること', upper: '今ハマっていること' } },
+  { key: 'million', labels: { lower: '100まんえん あったら なにする？', middle: '100万円あったら 何する？', upper: '100万円あったら何する？' } },
+  { key: 'island', labels: { lower: 'むじんとうに なにか もっていくなら？', middle: '無人島に 何か もっていくなら？', upper: '無人島に何か持って行くなら？' } },
+  { key: 'admire', labels: { lower: 'あこがれの ひとは？', middle: 'あこがれの人は？', upper: '憧れの人は？' } },
+  { key: 'once', labels: { lower: 'いちどは やってみたいことは？', middle: '一度は やってみたいことは？', upper: '人生で一度はやってみたいことは？' } },
+  { key: 'country', labels: { lower: 'いきたい くには？', middle: '行きたい 国は？', upper: '行きたい国は？' } },
+  { key: 'food', labels: { lower: 'すきな りょうりは？', middle: '好きな 料理は？', upper: '好きな料理は？' } },
 ];
 const REQUIRED_QUESTION_COUNT = 4;
 let selectedQuestionKeys = [];
 let questionAnswers = {};
 
 function createKidsElements() {
-  const dream = { id: uid(), role: 'dream', type: 'text', text: 'しょうらいのゆめ：', x: 6, y: 19, size: 7, bold: true, color: '#2563eb', extrude: 0.4 };
+  const mode = currentGradeMode();
+  const dream = { id: uid(), role: 'dream', type: 'text', text: `${mode.dreamPrefix}：`, x: 6, y: 19, size: 7, bold: true, color: '#2563eb', extrude: 0.4 };
   return [
-    { id: uid(), role: 'name', type: 'text', text: 'なまえ：', x: 6, y: 10, size: 12, bold: true, color: '#111111', extrude: 0.5 },
+    { id: uid(), role: 'name', type: 'text', text: `${mode.namePrefix}：`, x: 6, y: 10, size: 12, bold: true, color: '#111111', extrude: 0.5 },
     dream,
     createDreamIllustrationElement(dream.text),
   ];
@@ -677,11 +780,32 @@ function syncDreamIllustration() {
 }
 
 function dreamAnswer(text) {
-  return String(text || '').replace(/^しょうらいのゆめ[：:]\s*/, '');
+  return String(text || '').replace(/^(?:しょうらいのゆめ|しょうらいの夢|将来の夢)[：:]\s*/, '');
 }
 
 function nameAnswer(text) {
-  return String(text || '').replace(/^なまえ[：:]\s*/, '');
+  return String(text || '').replace(/^(?:なまえ|名前)[：:]\s*/, '');
+}
+
+function currentGradeMode() {
+  return GRADE_MODES[gradeMode] || GRADE_MODES.lower;
+}
+
+function questionLabel(question) {
+  return question.labels[gradeMode] || question.labels.upper;
+}
+
+function syncGradeModeUI() {
+  const mode = currentGradeMode();
+  document.querySelectorAll('.template-btn[data-grade-mode]').forEach(button => {
+    const selected = button.dataset.gradeMode === gradeMode;
+    button.classList.toggle('selected', selected);
+    button.setAttribute('aria-pressed', String(selected));
+  });
+  document.getElementById('name-label-text').textContent = mode.nameLabel;
+  document.getElementById('dream-label-text').textContent = mode.dreamLabel;
+  document.getElementById('name-input').placeholder = gradeMode === 'lower' ? '例：ゆうき' : '例：ゆうき';
+  document.getElementById('dream-input').placeholder = gradeMode === 'lower' ? '例：おいしゃさん' : '例：医者';
 }
 
 function syncNameInput() {
@@ -706,7 +830,7 @@ function updateNameFromInput(value) {
   const name = elements.find(el => el.role === 'name');
   if (!name) return;
   document.getElementById('name-input').setCustomValidity('');
-  name.text = `なまえ：${value}`;
+  name.text = `${currentGradeMode().namePrefix}：${value}`;
   if (selectedId === name.id) document.getElementById('prop-text').value = name.text;
   renderElementList();
   renderCanvas();
@@ -716,7 +840,7 @@ function updateDreamFromInput(value) {
   const dream = elements.find(el => el.role === 'dream');
   if (!dream) return;
   document.getElementById('dream-input').setCustomValidity('');
-  dream.text = `しょうらいのゆめ：${value}`;
+  dream.text = `${currentGradeMode().dreamPrefix}：${value}`;
   syncDreamIllustration();
   if (selectedId === dream.id) document.getElementById('prop-text').value = dream.text;
   renderElementList();
@@ -738,7 +862,7 @@ function syncQuestionElements() {
     const previous = existing.get(key);
     elements.push({
       id: previous?.id || uid(), role: 'profile-question', questionKey: key, type: 'text',
-      text: `${question.label}：${questionAnswers[key] || ''}`,
+      text: `${questionLabel(question)}：${questionAnswers[key] || ''}`,
       x: previous?.x ?? 6, y: previous?.y ?? 28 + index * 6.5,
       size: previous?.size ?? 5, bold: previous?.bold ?? true,
       color: previous?.color || '#444444', extrude: previous?.extrude ?? 0.3,
@@ -770,7 +894,7 @@ function renderQuestionPicker() {
     checkbox.disabled = !profileActive || (!checked && selectedQuestionKeys.length >= REQUIRED_QUESTION_COUNT);
     checkbox.addEventListener('change', () => toggleProfileQuestion(question.key, checkbox.checked));
     const text = document.createElement('span');
-    text.textContent = question.label;
+    text.textContent = questionLabel(question);
     option.append(checkbox, text);
     picker.appendChild(option);
   }
@@ -780,13 +904,13 @@ function renderQuestionPicker() {
     if (!question) continue;
     const label = document.createElement('label');
     label.htmlFor = `question-answer-${key}`;
-    label.innerHTML = `${escHtml(question.label)}<span class="required-mark">必須</span>`;
+    label.innerHTML = `${escHtml(questionLabel(question))}<span class="required-mark">必須</span>`;
     const input = document.createElement('input');
     input.type = 'text';
     input.id = `question-answer-${key}`;
     input.required = true;
     input.disabled = !profileActive;
-    input.placeholder = '回答を入力';
+    input.placeholder = currentGradeMode().answerPlaceholder;
     input.value = questionAnswers[key] || '';
     input.addEventListener('input', () => updateQuestionAnswer(key, input.value));
     answers.append(label, input);
@@ -816,7 +940,7 @@ function updateQuestionAnswer(key, value) {
   if (input) input.setCustomValidity('');
   const question = questionDefinition(key);
   const element = elements.find(el => el.role === 'profile-question' && el.questionKey === key);
-  if (question && element) element.text = `${question.label}：${value}`;
+  if (question && element) element.text = `${questionLabel(question)}：${value}`;
   if (selectedId === element?.id) document.getElementById('prop-text').value = element.text;
   renderElementList();
   renderCanvas();
@@ -844,7 +968,7 @@ function validateRequiredProfile() {
   for (const key of selectedQuestionKeys) {
     const question = questionDefinition(key);
     const input = document.getElementById(`question-answer-${key}`);
-    input.setCustomValidity(input.value.trim() ? '' : `${question.label}の回答を入力してください。`);
+    input.setCustomValidity(input.value.trim() ? '' : `${questionLabel(question)}の回答を入力してください。`);
     if (!input.reportValidity()) return false;
   }
   return true;
@@ -872,6 +996,7 @@ function createDraftSnapshot() {
     questionAnswers,
     backgroundDesign,
     selectedFontKey,
+    gradeMode,
     cardSize: document.getElementById('card-size').value,
     cardW: +document.getElementById('card-w').value || cardW,
     cardH: +document.getElementById('card-h').value || cardH,
@@ -924,6 +1049,7 @@ function restoreTemporaryDraft({ automatic = false } = {}) {
     questionAnswers = draft.questionAnswers && typeof draft.questionAnswers === 'object' ? { ...draft.questionAnswers } : {};
     backgroundDesign = BACKGROUND_DESIGNS[draft.backgroundDesign] ? draft.backgroundDesign : 'plain';
     selectedFontKey = FONT_OPTIONS[draft.selectedFontKey] ? draft.selectedFontKey : 'gothic';
+    gradeMode = GRADE_MODES[draft.gradeMode] ? draft.gradeMode : 'lower';
 
     const width = Number(draft.cardW);
     const height = Number(draft.cardH);
@@ -941,6 +1067,7 @@ function restoreTemporaryDraft({ automatic = false } = {}) {
 
     selectedId = null;
     document.getElementById('properties-panel').classList.add('hidden');
+    syncGradeModeUI();
     syncNameInput();
     syncDreamInput();
     syncBackgroundDesignButtons();
@@ -965,6 +1092,7 @@ function clearEditorContent() {
   questionAnswers = {};
   backgroundDesign = 'plain';
   selectedFontKey = 'gothic';
+  gradeMode = 'lower';
   elements = createKidsElements();
   document.getElementById('properties-panel').classList.add('hidden');
   document.getElementById('card-size').value = '91x55';
@@ -975,6 +1103,7 @@ function clearEditorContent() {
   document.getElementById('base-thickness').value = '0.8';
   document.getElementById('font-select').value = selectedFontKey;
   document.getElementById('font-badge').textContent = currentFontOption().label;
+  syncGradeModeUI();
   syncNameInput();
   syncDreamInput();
   syncBackgroundDesignButtons();
@@ -1048,7 +1177,8 @@ function onCardSizeChange() {
   }
 }
 
-function applyTemplate() {
+function applyTemplate(mode = 'lower') {
+  gradeMode = GRADE_MODES[mode] ? mode : 'lower';
   selectedId = null;
   selectedQuestionKeys = [];
   questionAnswers = {};
@@ -1058,6 +1188,7 @@ function applyTemplate() {
 
   elements = createKidsElements();
 
+  syncGradeModeUI();
   syncNameInput();
   syncDreamInput();
   syncBackgroundDesignButtons();
@@ -1597,8 +1728,9 @@ function updateSelectedProp(key, value) {
   }
   if (key === 'text' && el.role === 'profile-question') {
     const question = questionDefinition(el.questionKey);
-    questionAnswers[el.questionKey] = question && value.startsWith(`${question.label}：`)
-      ? value.slice(question.label.length + 1)
+    const label = question ? questionLabel(question) : '';
+    questionAnswers[el.questionKey] = question && value.startsWith(`${label}：`)
+      ? value.slice(label.length + 1)
       : value;
     renderQuestionPicker();
   }
