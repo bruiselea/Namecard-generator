@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>名刺ジェネレーター</title>
 <script src="https://cdn.jsdelivr.net/npm/opentype.js@1.3.4/dist/opentype.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/earcut@2.2.4/src/earcut.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/earcut@2.2.4/dist/earcut.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -148,7 +148,7 @@
 
   .canvas-area {
     flex: 1;
-    background: #111;
+    background: pink;
     overflow: hidden;
     position: relative;
   }
@@ -195,7 +195,7 @@
     <div class="panel-section">
       <h2>テンプレート</h2>
       <div class="template-grid">
-        <button class="template-btn" onclick="applyTemplate('business')">ビジネス</button>
+        <button class="template-btn" onclick="applyTemplate('business')">なまえ + ゆめ</button>
         <button class="template-btn" onclick="applyTemplate('qr-logo')">ロゴ + QR</button>
       </div>
     </div>
@@ -237,6 +237,8 @@
       <div id="element-list-container"></div>
       <button class="add-btn" onclick="addElement()">＋ テキストを追加</button>
       <button class="add-btn" onclick="addQRElement()">＋ QRを追加</button>
+      <button class="add-btn" onclick="document.getElementById('photo-file').click()">＋ 写真を追加</button>
+      <input type="file" id="photo-file" accept="image/png,image/jpeg,image/webp,image/svg+xml" style="display:none" onchange="onPhotoFileInput(this)">
     </div>
 
     <!-- 選択要素プロパティ -->
@@ -310,15 +312,118 @@ function clientToMM(clientX, clientY) {
   };
 }
 
-let elements = [
-  { id: uid(), type: 'text', text: '山田 太郎',           x: 8, y: 14, size: 18, bold: true, color: '#111111', extrude: 0.5 },
-  { id: uid(), type: 'text', text: 'Taro Yamada',         x: 8, y: 21, size: 9,  bold: true, color: '#444444', extrude: 0.4 },
-  { id: uid(), type: 'text', text: '株式会社サンプル',     x: 8, y: 31, size: 9,  bold: true, color: '#2563eb', extrude: 0.4 },
-  { id: uid(), type: 'text', text: '090-0000-0000',       x: 8, y: 43, size: 7,  bold: true, color: '#555555', extrude: 0.3 },
-  { id: uid(), type: 'text', text: 'sample@example.com', x: 8, y: 50, size: 7,  bold: true, color: '#555555', extrude: 0.3 },
-];
+let elements;
 
 function uid() { return Math.random().toString(36).slice(2); }
+
+const DREAM_ART_LIBRARY = [
+  {
+    label: 'ロケット',
+    keywords: ['うちゅう', '宇宙', 'ロケット', 'パイロット', '飛行士'],
+    palette: { B: '#60a5fa', R: '#ef4444', W: '#f8fafc', Y: '#facc15' },
+    pattern: [
+      '.....W......', '....WWW.....', '...WBBBW....', '...WBBBW....',
+      '...WRRRW....', '..WWRRRWW...', '.R.WRRRW.R..', 'RR.WWWWW.RR.',
+      '...Y.Y.Y....', '..YY.Y.YY...', '............', '............',
+    ],
+  },
+  {
+    label: 'おいしゃさん',
+    keywords: ['いしゃ', '医者', 'お医者', 'かんご', '看護', 'びょういん', '病院'],
+    palette: { R: '#ef4444', W: '#f8fafc', B: '#38bdf8' },
+    pattern: [
+      '....WWWW....', '...WWRRWW...', '...WWRRWW...', '..WWWWWWWW..',
+      '..WBBBBBBW..', '..WBBRRBBW..', '..WBBRRBBW..', '..WBBBBBBW..',
+      '..WWWWWWWW..', '...WW..WW...', '...WW..WW...', '............',
+    ],
+  },
+  {
+    label: 'スポーツ',
+    keywords: ['サッカー', 'やきゅう', '野球', 'スポーツ', 'せんしゅ', '選手'],
+    palette: { K: '#111827', W: '#f8fafc' },
+    pattern: [
+      '....WWWW....', '..WWWKKWWW..', '.WWKKWWKKWW.', '.WKKWWWWKKW.',
+      'WWWWKKWWWWWW', 'WKWWKKKKWWKW', 'WKWWKKKKWWKW', 'WWWWKKWWWWWW',
+      '.WKKWWWWKKW.', '.WWKKWWKKWW.', '..WWWKKWWW..', '....WWWW....',
+    ],
+  },
+  {
+    label: 'りょうり',
+    keywords: ['りょうり', '料理', 'シェフ', 'パティシエ', 'パンや', 'パン屋'],
+    palette: { R: '#ef4444', W: '#f8fafc', Y: '#f59e0b' },
+    pattern: [
+      '....WWWW....', '..WWWWWWWW..', '.WWWWWWWWWW.', '..WWWWWWWW..',
+      '...WWWWWW...', '...RRRRRR...', '..RRRRRRRR..', '..RRYYYYRR..',
+      '..RRYYYYRR..', '...RRRRRR...', '....RRRR....', '............',
+    ],
+  },
+  {
+    label: 'おえかき',
+    keywords: ['えかき', '絵描き', 'がか', '画家', 'イラスト', 'デザイナー'],
+    palette: { B: '#3b82f6', G: '#22c55e', R: '#ef4444', Y: '#facc15' },
+    pattern: [
+      '.....YY.....', '....YYYY....', '...YYRRYY...', '..YYRRRRYY..',
+      '..YRRBBRRY..', '..YRGBBGRY..', '..YRGGGGRY..', '..YYGGGGYY..',
+      '...YYGGYY...', '....YYYY....', '.....YY.....', '............',
+    ],
+  },
+];
+
+const DEFAULT_DREAM_ART = {
+  label: 'ゆめ',
+  keywords: [],
+  palette: { B: '#60a5fa', Y: '#facc15' },
+  pattern: [
+    '.....Y......', '....YYY.....', 'YYYYYYYYYYY.', '.YYYYYYYYY..',
+    '..YYYYYYY...', '...YYYYY....', '..YYY.YYY...', '.YYY...YYY..',
+    'YY.......YY.', '............', '.....B......', '....BBB.....',
+  ],
+};
+
+function createKidsElements() {
+  const dream = { id: uid(), role: 'dream', type: 'text', text: 'しょうらいのゆめ：うちゅうひこうし', x: 6, y: 19, size: 7, bold: true, color: '#2563eb', extrude: 0.4 };
+  return [
+    { id: uid(), type: 'text', text: 'なまえ：やまだ たろう', x: 6, y: 10, size: 12, bold: true, color: '#111111', extrude: 0.5 },
+    dream,
+    { id: uid(), type: 'text', text: '今ハマっていること：サッカー', x: 6, y: 28, size: 6, bold: true, color: '#444444', extrude: 0.3 },
+    { id: uid(), type: 'text', text: '100万円あったら何する？：世界一周', x: 6, y: 37, size: 6, bold: true, color: '#444444', extrude: 0.3 },
+    { id: uid(), type: 'text', text: '無人島に何か持って行くなら？：本', x: 6, y: 46, size: 6, bold: true, color: '#444444', extrude: 0.3 },
+    createDreamIllustrationElement(dream.text),
+  ];
+}
+
+function getDreamArt(text) {
+  const normalized = String(text || '').toLowerCase();
+  return DREAM_ART_LIBRARY.find(art => art.keywords.some(keyword => normalized.includes(keyword.toLowerCase()))) || DEFAULT_DREAM_ART;
+}
+
+function dreamArtPixels(art) {
+  return art.pattern.flatMap((row, y) =>
+    [...row].flatMap((cell, x) => art.palette[cell] ? [{ x, y, color: art.palette[cell] }] : [])
+  );
+}
+
+function createDreamIllustrationElement(dreamText) {
+  const art = getDreamArt(dreamText);
+  const gridW = Math.max(...art.pattern.map(row => row.length));
+  return {
+    id: uid(), role: 'dream-illustration', type: 'image', text: art.label,
+    x: Math.max(2, cardW - 18), y: Math.max(2, cardH - 18), size: 14,
+    gridW, gridH: art.pattern.length, pixels: dreamArtPixels(art), vectorGroups: [],
+    bold: true, color: Object.values(art.palette)[0], extrude: 0.4,
+  };
+}
+
+function syncDreamIllustration() {
+  const dream = elements.find(el => el.role === 'dream');
+  const current = elements.find(el => el.role === 'dream-illustration');
+  if (!dream) return;
+  const next = createDreamIllustrationElement(dream.text);
+  if (current) Object.assign(current, next, { id: current.id, x: current.x, y: current.y });
+  else elements.push(next);
+}
+
+elements = createKidsElements();
 
 // ============================================================
 // フォント読み込み
@@ -381,13 +486,7 @@ function applyTemplate(name) {
       { id: uid(), type: 'qr', text: 'https://example.com', x: 56, y: 11, size: 33, bold: true, color: '#111111', extrude: 0.5 },
     ];
   } else {
-    elements = [
-      { id: uid(), type: 'text', text: '山田 太郎',           x: 8, y: 14, size: 18, bold: true, color: '#111111', extrude: 0.5 },
-      { id: uid(), type: 'text', text: 'Taro Yamada',         x: 8, y: 21, size: 9,  bold: true, color: '#444444', extrude: 0.4 },
-      { id: uid(), type: 'text', text: '株式会社サンプル',     x: 8, y: 31, size: 9,  bold: true, color: '#2563eb', extrude: 0.4 },
-      { id: uid(), type: 'text', text: '090-0000-0000',       x: 8, y: 43, size: 7,  bold: true, color: '#555555', extrude: 0.3 },
-      { id: uid(), type: 'text', text: 'sample@example.com', x: 8, y: 50, size: 7,  bold: true, color: '#555555', extrude: 0.3 },
-    ];
+    elements = createKidsElements();
   }
 
   renderElementList();
@@ -411,11 +510,24 @@ function renderCanvas(recenter = false) {
   const pixelW = Math.round(cssW * dpr);
   const pixelH = Math.round(cssH * dpr);
   const prevW = canvas.width, prevH = canvas.height;
+  const dimensionsChanged = prevW !== pixelW || prevH !== pixelH;
   canvas.width = pixelW;
   canvas.height = pixelH;
   canvas.style.width = `${cssW}px`;
   canvas.style.height = `${cssH}px`;
-  if (recenter || prevW !== pixelW || prevH !== pixelH) centerView();
+  if (dimensionsChanged) {
+    const dreamArt = elements.find(el => el.role === 'dream-illustration');
+    if (dreamArt) {
+      dreamArt.x = Math.max(2, cardW - dreamArt.size - 4);
+      dreamArt.y = Math.max(2, cardH - getElementHeight(dreamArt) - 4);
+    }
+    const photo = elements.find(el => el.role === 'photo');
+    if (photo) {
+      photo.x = Math.max(2, cardW - photo.size - 4);
+      photo.y = 4;
+    }
+  }
+  if (recenter || dimensionsChanged) centerView();
 
   ctx.fillStyle = document.getElementById('base-color').value;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -841,7 +953,7 @@ function renderElementList() {
   for (const el of elements) {
     const item = document.createElement('div');
     item.className = 'element-item' + (el.id === selectedId ? ' selected' : '');
-    const label = el.type === 'qr' ? `QR: ${el.text}` : el.type === 'image' ? `ロゴ: ${el.text}` : el.text;
+    const label = el.type === 'qr' ? `QR: ${el.text}` : el.role === 'photo' ? `写真: ${el.text}` : el.role === 'dream-illustration' ? `ゆめのイラスト: ${el.text}` : el.type === 'image' ? `ロゴ: ${el.text}` : el.text;
     item.innerHTML = `
       <span class="color-dot" style="background:${el.color}"></span>
       <span class="elabel">${escHtml(label)}</span>
@@ -890,6 +1002,7 @@ function updateSelectedProp(key, value) {
   const el = elements.find(e => e.id === selectedId);
   if (!el) return;
   el[key] = value;
+  if (key === 'text' && el.role === 'dream') syncDreamIllustration();
   if (key === 'x') document.getElementById('prop-x').value = value;
   if (key === 'y') document.getElementById('prop-y').value = value;
   renderElementList();
@@ -913,6 +1026,73 @@ function addQRElement() {
   const el = { id: uid(), type: 'qr', text: 'https://example.com', x: 55, y: 12, size: 28, bold: true, color: '#000000', extrude: 0.5 };
   elements.push(el);
   selectElement(el.id);
+}
+
+async function onPhotoFileInput(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  if (!file.type.startsWith('image/')) {
+    alert('PNG、JPEG、WebPなどの画像ファイルを選択してください。');
+    input.value = '';
+    return;
+  }
+  try {
+    const photo = await rasterFileToPhotoElement(file);
+    elements = elements.filter(el => el.role !== 'photo');
+    elements.push(photo);
+    input.value = '';
+    selectElement(photo.id);
+  } catch(e) {
+    alert('写真の読み込みに失敗しました: ' + e.message);
+    console.error(e);
+  }
+}
+
+async function rasterFileToPhotoElement(file) {
+  const image = await loadLocalImage(file);
+  const targetCells = 32;
+  const scale = targetCells / Math.max(image.naturalWidth, image.naturalHeight);
+  const gridW = Math.max(1, Math.round(image.naturalWidth * scale));
+  const gridH = Math.max(1, Math.round(image.naturalHeight * scale));
+  const raster = document.createElement('canvas');
+  raster.width = gridW;
+  raster.height = gridH;
+  const rasterCtx = raster.getContext('2d', { willReadFrequently: true });
+  rasterCtx.imageSmoothingEnabled = true;
+  rasterCtx.drawImage(image, 0, 0, gridW, gridH);
+  const data = rasterCtx.getImageData(0, 0, gridW, gridH).data;
+  const pixels = [];
+  for (let y = 0; y < gridH; y++) {
+    for (let x = 0; x < gridW; x++) {
+      const i = (y * gridW + x) * 4;
+      if (data[i + 3] < 32) continue;
+      pixels.push({ x, y, color: quantizePhotoColor(data[i], data[i + 1], data[i + 2]) });
+    }
+  }
+  const maxDisplaySize = 20;
+  const displayWidth = gridW >= gridH ? maxDisplaySize : maxDisplaySize * gridW / gridH;
+  return {
+    id: uid(), role: 'photo', type: 'image', text: file.name,
+    x: Math.max(2, cardW - displayWidth - 4), y: 4, size: displayWidth,
+    gridW, gridH, pixels, vectorGroups: [], bold: true,
+    color: pixels[0]?.color || '#111111', extrude: 0.3,
+  };
+}
+
+function loadLocalImage(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => { URL.revokeObjectURL(url); resolve(image); };
+    image.onerror = () => { URL.revokeObjectURL(url); reject(new Error('画像を開けませんでした')); };
+    image.src = url;
+  });
+}
+
+function quantizePhotoColor(r, g, b) {
+  const levels = [32, 128, 224];
+  const nearest = value => levels.reduce((best, level) => Math.abs(level - value) < Math.abs(best - value) ? level : best);
+  return '#' + [r, g, b].map(nearest).map(value => value.toString(16).padStart(2, '0')).join('');
 }
 
 async function onLogoFileInput(input) {
