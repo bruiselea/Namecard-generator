@@ -239,7 +239,6 @@
 
   @media (max-width: 720px) {
     body:not(.shared-card-view) { height: auto; min-height: 100vh; }
-    header { padding: 10px 12px; gap: 8px; flex-wrap: wrap; }
     body.shared-card-view { width: 100%; min-height: 100dvh; overflow-x: hidden; }
     body.shared-card-view > .shared-card-page {
       width: 100%; min-height: 100dvh; padding: 20px 12px max(20px, env(safe-area-inset-bottom));
@@ -256,7 +255,7 @@
       display: inline-flex; width: 100%; min-height: 48px; margin-top: 20px;
       align-items: center; justify-content: center; font-weight: 600;
     }
-    header { padding: 10px 12px; gap: 8px; }
+    header { padding: 10px 12px; gap: 8px; flex-wrap: wrap; }
     header h1 { flex: 1; font-size: 15px; }
     header .badge, header .spacer { display: none; }
     header .draft-actions { order: 3; width: 100%; display: grid; grid-template-columns: repeat(3, 1fr); }
