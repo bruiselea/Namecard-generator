@@ -200,6 +200,13 @@
       </div>
     </div>
 
+    <!-- プロフィール入力 -->
+    <div class="panel-section">
+      <h2>プロフィール入力</h2>
+      <label for="dream-input">将来の夢</label>
+      <input type="text" id="dream-input" value="うちゅうひこうし" placeholder="例：おいしゃさん" oninput="updateDreamFromInput(this.value)">
+    </div>
+
     <!-- フォント -->
     <div class="panel-section">
       <h2>フォント</h2>
@@ -423,6 +430,27 @@ function syncDreamIllustration() {
   else elements.push(next);
 }
 
+function dreamAnswer(text) {
+  return String(text || '').replace(/^しょうらいのゆめ[：:]\s*/, '');
+}
+
+function syncDreamInput() {
+  const input = document.getElementById('dream-input');
+  const dream = elements.find(el => el.role === 'dream');
+  input.disabled = !dream;
+  input.value = dream ? dreamAnswer(dream.text) : '';
+}
+
+function updateDreamFromInput(value) {
+  const dream = elements.find(el => el.role === 'dream');
+  if (!dream) return;
+  dream.text = `しょうらいのゆめ：${value}`;
+  syncDreamIllustration();
+  if (selectedId === dream.id) document.getElementById('prop-text').value = dream.text;
+  renderElementList();
+  renderCanvas();
+}
+
 elements = createKidsElements();
 
 // ============================================================
@@ -489,6 +517,7 @@ function applyTemplate(name) {
     elements = createKidsElements();
   }
 
+  syncDreamInput();
   renderElementList();
   renderCanvas(true);
 }
@@ -1002,7 +1031,10 @@ function updateSelectedProp(key, value) {
   const el = elements.find(e => e.id === selectedId);
   if (!el) return;
   el[key] = value;
-  if (key === 'text' && el.role === 'dream') syncDreamIllustration();
+  if (key === 'text' && el.role === 'dream') {
+    syncDreamIllustration();
+    syncDreamInput();
+  }
   if (key === 'x') document.getElementById('prop-x').value = value;
   if (key === 'y') document.getElementById('prop-y').value = value;
   renderElementList();
@@ -1116,6 +1148,7 @@ async function onLogoFileInput(input) {
 
 function deleteElement(id) {
   elements = elements.filter(el => el.id !== id);
+  syncDreamInput();
   if (selectedId === id) {
     selectedId = null;
     document.getElementById('properties-panel').classList.add('hidden');
