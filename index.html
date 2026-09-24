@@ -178,6 +178,31 @@
     vertical-align: middle;
   }
   .badge.ok { background: #4ade8022; color: #4ade80; border-color: #4ade8044; }
+  .required-mark { color: #f87171; font-size: 10px; margin-left: 4px; }
+  .question-picker { display: grid; gap: 5px; margin-top: 6px; }
+  .question-option {
+    display: flex; align-items: flex-start; gap: 7px; margin: 0; padding: 5px 7px;
+    border: 1px solid #3f3f3f; border-radius: 4px; color: #ccc; cursor: pointer;
+  }
+  .question-option:has(input:checked) { border-color: #2563eb; background: #1e3a5f; }
+  .question-option input { flex-shrink: 0; margin-top: 2px; }
+  .question-option:has(input:disabled) { opacity: 0.45; cursor: not-allowed; }
+  .question-count { margin-top: 7px; font-size: 11px; color: #9ca3af; }
+  .question-count.complete { color: #4ade80; }
+  .question-count.error { color: #f87171; }
+  .question-answers { margin-top: 10px; }
+  .background-design-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+  .background-design-btn {
+    background: #2a2a2a; border: 1px solid #444; color: #ddd; border-radius: 5px;
+    padding: 6px; font-size: 11px; cursor: pointer; text-align: left;
+  }
+  .background-design-btn:hover { border-color: #777; }
+  .background-design-btn.selected { border-color: #2563eb; box-shadow: 0 0 0 1px #2563eb; }
+  .background-preview { display: block; height: 24px; margin-bottom: 5px; border-radius: 3px; border: 1px solid #555; }
+  .background-preview.plain { background: #fff; }
+  .background-preview.sky { background: linear-gradient(165deg, #dbeafe 0 65%, #bfdbfe 65% 100%); }
+  .background-preview.cool { background: linear-gradient(135deg, #111827 0 12%, #e5e7eb 12% 72%, #22d3ee 72% 78%, #1f2937 78%); }
+  .background-preview.cute { background: radial-gradient(circle at 22% 35%, #fb7185 0 8%, transparent 9%), radial-gradient(circle at 72% 65%, #f9a8d4 0 8%, transparent 9%), #fff1f2; }
 </style>
 </head>
 <body>
@@ -200,6 +225,19 @@
       </div>
     </div>
 
+    <!-- プロフィール入力 -->
+    <div class="panel-section">
+      <h2>プロフィール入力</h2>
+      <label for="name-input">名前<span class="required-mark">必須</span></label>
+      <input type="text" id="name-input" required aria-required="true" placeholder="例：やまだ たろう" oninput="updateNameFromInput(this.value)">
+      <label for="dream-input">将来の夢<span class="required-mark">必須</span></label>
+      <input type="text" id="dream-input" required aria-required="true" placeholder="例：おいしゃさん" oninput="updateDreamFromInput(this.value)">
+      <label>追加する質問<span class="required-mark">4つ選択</span></label>
+      <div id="question-picker" class="question-picker" tabindex="-1"></div>
+      <div id="question-count" class="question-count" aria-live="polite"></div>
+      <div id="question-answers" class="question-answers"></div>
+    </div>
+
     <!-- フォント -->
     <div class="panel-section">
       <h2>フォント</h2>
@@ -213,6 +251,13 @@
     <!-- カード設定 -->
     <div class="panel-section">
       <h2>カード設定</h2>
+      <label>背景デザイン</label>
+      <div class="background-design-grid" id="background-design-grid">
+        <button type="button" class="background-design-btn selected" data-design="plain" onclick="applyBackgroundDesign('plain')"><span class="background-preview plain"></span>無柄・色のみ</button>
+        <button type="button" class="background-design-btn" data-design="sky" onclick="applyBackgroundDesign('sky')"><span class="background-preview sky"></span>空</button>
+        <button type="button" class="background-design-btn" data-design="cool" onclick="applyBackgroundDesign('cool')"><span class="background-preview cool"></span>クール</button>
+        <button type="button" class="background-design-btn" data-design="cute" onclick="applyBackgroundDesign('cute')"><span class="background-preview cute"></span>かわいい</button>
+      </div>
       <label>サイズ</label>
       <select id="card-size" onchange="onCardSizeChange()">
         <option value="91x55">標準 91×55mm</option>
@@ -284,6 +329,48 @@ let cardW = 91, cardH = 55;
 let selectedId = null;
 let dragState = null;
 let loadedFont = null;
+let backgroundDesign = 'plain';
+
+const BACKGROUND_DESIGNS = {
+  plain: { label: '無柄・色のみ', baseColor: null, shapes: [] },
+  sky: {
+    label: '空', baseColor: '#dbeafe',
+    shapes: [
+      { x: 0, y: 0.82, w: 1, h: 0.18, color: '#bfdbfe' },
+      { x: 0.73, y: 0.10, w: 0.18, h: 0.06, color: '#ffffff' },
+      { x: 0.77, y: 0.06, w: 0.07, h: 0.10, color: '#ffffff' },
+      { x: 0.15, y: 0.72, w: 0.15, h: 0.05, color: '#eff6ff' },
+      { x: 0.19, y: 0.68, w: 0.06, h: 0.09, color: '#eff6ff' },
+      { x: 0.91, y: 0.04, w: 0.035, h: 0.06, color: '#fde68a' },
+      { x: 0.895, y: 0.055, w: 0.065, h: 0.03, color: '#fde68a' },
+    ],
+  },
+  cool: {
+    label: 'クール', baseColor: '#e5e7eb',
+    shapes: [
+      { x: 0, y: 0, w: 1, h: 0.035, color: '#111827' },
+      { x: 0.965, y: 0, w: 0.035, h: 1, color: '#111827' },
+      { x: 0.78, y: 0.12, w: 0.18, h: 0.055, color: '#22d3ee' },
+      { x: 0.84, y: 0.19, w: 0.12, h: 0.045, color: '#374151' },
+      { x: 0.72, y: 0.76, w: 0.24, h: 0.045, color: '#111827' },
+      { x: 0.80, y: 0.83, w: 0.16, h: 0.055, color: '#22d3ee' },
+    ],
+  },
+  cute: {
+    label: 'かわいい', baseColor: '#fff1f2',
+    shapes: [
+      { x: 0.82, y: 0.08, w: 0.035, h: 0.05, color: '#fb7185' },
+      { x: 0.87, y: 0.08, w: 0.035, h: 0.05, color: '#fb7185' },
+      { x: 0.80, y: 0.12, w: 0.125, h: 0.045, color: '#fb7185' },
+      { x: 0.825, y: 0.16, w: 0.075, h: 0.045, color: '#fb7185' },
+      { x: 0.85, y: 0.20, w: 0.025, h: 0.035, color: '#fb7185' },
+      { x: 0.08, y: 0.84, w: 0.025, h: 0.04, color: '#f9a8d4' },
+      { x: 0.12, y: 0.82, w: 0.025, h: 0.04, color: '#f9a8d4' },
+      { x: 0.91, y: 0.72, w: 0.025, h: 0.04, color: '#fbbf24' },
+      { x: 0.87, y: 0.76, w: 0.025, h: 0.04, color: '#fbbf24' },
+    ],
+  },
+};
 
 // ビュー変換
 let viewZoom = 1;
@@ -380,14 +467,24 @@ const DEFAULT_DREAM_ART = {
   ],
 };
 
+const PROFILE_QUESTIONS = [
+  { key: 'interest', label: '今ハマっていること' },
+  { key: 'million', label: '100万円あったら何する？' },
+  { key: 'island', label: '無人島に何か持って行くなら？' },
+  { key: 'admire', label: '憧れの人は？' },
+  { key: 'once', label: '人生で一度はやってみたいことは？' },
+  { key: 'country', label: '行きたい国は？' },
+  { key: 'food', label: '好きな料理は？' },
+];
+const REQUIRED_QUESTION_COUNT = 4;
+let selectedQuestionKeys = [];
+let questionAnswers = {};
+
 function createKidsElements() {
-  const dream = { id: uid(), role: 'dream', type: 'text', text: 'しょうらいのゆめ：うちゅうひこうし', x: 6, y: 19, size: 7, bold: true, color: '#2563eb', extrude: 0.4 };
+  const dream = { id: uid(), role: 'dream', type: 'text', text: 'しょうらいのゆめ：', x: 6, y: 19, size: 7, bold: true, color: '#2563eb', extrude: 0.4 };
   return [
-    { id: uid(), type: 'text', text: 'なまえ：やまだ たろう', x: 6, y: 10, size: 12, bold: true, color: '#111111', extrude: 0.5 },
+    { id: uid(), role: 'name', type: 'text', text: 'なまえ：', x: 6, y: 10, size: 12, bold: true, color: '#111111', extrude: 0.5 },
     dream,
-    { id: uid(), type: 'text', text: '今ハマっていること：サッカー', x: 6, y: 28, size: 6, bold: true, color: '#444444', extrude: 0.3 },
-    { id: uid(), type: 'text', text: '100万円あったら何する？：世界一周', x: 6, y: 37, size: 6, bold: true, color: '#444444', extrude: 0.3 },
-    { id: uid(), type: 'text', text: '無人島に何か持って行くなら？：本', x: 6, y: 46, size: 6, bold: true, color: '#444444', extrude: 0.3 },
     createDreamIllustrationElement(dream.text),
   ];
 }
@@ -423,7 +520,182 @@ function syncDreamIllustration() {
   else elements.push(next);
 }
 
+function dreamAnswer(text) {
+  return String(text || '').replace(/^しょうらいのゆめ[：:]\s*/, '');
+}
+
+function nameAnswer(text) {
+  return String(text || '').replace(/^なまえ[：:]\s*/, '');
+}
+
+function syncNameInput() {
+  const input = document.getElementById('name-input');
+  const name = elements.find(el => el.role === 'name');
+  input.disabled = !name;
+  input.required = !!name;
+  input.value = name ? nameAnswer(name.text) : '';
+  input.setCustomValidity('');
+}
+
+function syncDreamInput() {
+  const input = document.getElementById('dream-input');
+  const dream = elements.find(el => el.role === 'dream');
+  input.disabled = !dream;
+  input.required = !!dream;
+  input.value = dream ? dreamAnswer(dream.text) : '';
+  input.setCustomValidity('');
+}
+
+function updateNameFromInput(value) {
+  const name = elements.find(el => el.role === 'name');
+  if (!name) return;
+  document.getElementById('name-input').setCustomValidity('');
+  name.text = `なまえ：${value}`;
+  if (selectedId === name.id) document.getElementById('prop-text').value = name.text;
+  renderElementList();
+  renderCanvas();
+}
+
+function updateDreamFromInput(value) {
+  const dream = elements.find(el => el.role === 'dream');
+  if (!dream) return;
+  document.getElementById('dream-input').setCustomValidity('');
+  dream.text = `しょうらいのゆめ：${value}`;
+  syncDreamIllustration();
+  if (selectedId === dream.id) document.getElementById('prop-text').value = dream.text;
+  renderElementList();
+  renderCanvas();
+}
+
+function questionDefinition(key) {
+  return PROFILE_QUESTIONS.find(question => question.key === key);
+}
+
+function syncQuestionElements() {
+  const existing = new Map(elements.filter(el => el.role === 'profile-question').map(el => [el.questionKey, el]));
+  const illustration = elements.find(el => el.role === 'dream-illustration');
+  elements = elements.filter(el => el.role !== 'profile-question' && el.role !== 'dream-illustration');
+
+  selectedQuestionKeys.forEach((key, index) => {
+    const question = questionDefinition(key);
+    if (!question) return;
+    const previous = existing.get(key);
+    elements.push({
+      id: previous?.id || uid(), role: 'profile-question', questionKey: key, type: 'text',
+      text: `${question.label}：${questionAnswers[key] || ''}`,
+      x: previous?.x ?? 6, y: previous?.y ?? 28 + index * 6.5,
+      size: previous?.size ?? 5, bold: previous?.bold ?? true,
+      color: previous?.color || '#444444', extrude: previous?.extrude ?? 0.3,
+    });
+  });
+
+  if (illustration) elements.push(illustration);
+  if (selectedId && !elements.some(el => el.id === selectedId)) {
+    selectedId = null;
+    document.getElementById('properties-panel').classList.add('hidden');
+  }
+}
+
+function renderQuestionPicker() {
+  const picker = document.getElementById('question-picker');
+  const answers = document.getElementById('question-answers');
+  const status = document.getElementById('question-count');
+  const profileActive = elements.some(el => el.role === 'dream');
+  picker.innerHTML = '';
+  answers.innerHTML = '';
+
+  for (const question of PROFILE_QUESTIONS) {
+    const checked = selectedQuestionKeys.includes(question.key);
+    const option = document.createElement('label');
+    option.className = 'question-option';
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = checked;
+    checkbox.disabled = !profileActive || (!checked && selectedQuestionKeys.length >= REQUIRED_QUESTION_COUNT);
+    checkbox.addEventListener('change', () => toggleProfileQuestion(question.key, checkbox.checked));
+    const text = document.createElement('span');
+    text.textContent = question.label;
+    option.append(checkbox, text);
+    picker.appendChild(option);
+  }
+
+  for (const key of selectedQuestionKeys) {
+    const question = questionDefinition(key);
+    if (!question) continue;
+    const label = document.createElement('label');
+    label.htmlFor = `question-answer-${key}`;
+    label.innerHTML = `${escHtml(question.label)}<span class="required-mark">必須</span>`;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.id = `question-answer-${key}`;
+    input.required = true;
+    input.disabled = !profileActive;
+    input.placeholder = '回答を入力';
+    input.value = questionAnswers[key] || '';
+    input.addEventListener('input', () => updateQuestionAnswer(key, input.value));
+    answers.append(label, input);
+  }
+
+  const count = selectedQuestionKeys.length;
+  status.textContent = profileActive ? `${count} / ${REQUIRED_QUESTION_COUNT} 問を選択中` : '子供向けテンプレートで使用できます';
+  status.className = 'question-count' + (count === REQUIRED_QUESTION_COUNT ? ' complete' : '');
+}
+
+function toggleProfileQuestion(key, checked) {
+  if (checked && !selectedQuestionKeys.includes(key) && selectedQuestionKeys.length < REQUIRED_QUESTION_COUNT) {
+    selectedQuestionKeys.push(key);
+  } else if (!checked) {
+    selectedQuestionKeys = selectedQuestionKeys.filter(selected => selected !== key);
+    delete questionAnswers[key];
+  }
+  syncQuestionElements();
+  renderQuestionPicker();
+  renderElementList();
+  renderCanvas();
+}
+
+function updateQuestionAnswer(key, value) {
+  questionAnswers[key] = value;
+  const input = document.getElementById(`question-answer-${key}`);
+  if (input) input.setCustomValidity('');
+  const question = questionDefinition(key);
+  const element = elements.find(el => el.role === 'profile-question' && el.questionKey === key);
+  if (question && element) element.text = `${question.label}：${value}`;
+  if (selectedId === element?.id) document.getElementById('prop-text').value = element.text;
+  renderElementList();
+  renderCanvas();
+}
+
+function validateRequiredProfile() {
+  const fields = [
+    { role: 'name', inputId: 'name-input', label: '名前' },
+    { role: 'dream', inputId: 'dream-input', label: '将来の夢' },
+  ];
+  for (const field of fields) {
+    if (!elements.some(el => el.role === field.role)) continue;
+    const input = document.getElementById(field.inputId);
+    input.setCustomValidity(input.value.trim() ? '' : `${field.label}を入力してください。`);
+    if (!input.reportValidity()) return false;
+  }
+  if (!elements.some(el => el.role === 'dream')) return true;
+  if (selectedQuestionKeys.length !== REQUIRED_QUESTION_COUNT) {
+    const status = document.getElementById('question-count');
+    status.textContent = `追加する質問を${REQUIRED_QUESTION_COUNT}つ選んでください。`;
+    status.className = 'question-count error';
+    document.getElementById('question-picker').focus();
+    return false;
+  }
+  for (const key of selectedQuestionKeys) {
+    const question = questionDefinition(key);
+    const input = document.getElementById(`question-answer-${key}`);
+    input.setCustomValidity(input.value.trim() ? '' : `${question.label}の回答を入力してください。`);
+    if (!input.reportValidity()) return false;
+  }
+  return true;
+}
+
 elements = createKidsElements();
+renderQuestionPicker();
 
 // ============================================================
 // フォント読み込み
@@ -459,6 +731,37 @@ fontDrop.addEventListener('drop', async e => {
 });
 
 // ============================================================
+// 背景デザイン
+// ============================================================
+function currentBackgroundDesign() {
+  return BACKGROUND_DESIGNS[backgroundDesign] || BACKGROUND_DESIGNS.plain;
+}
+
+function syncBackgroundDesignButtons() {
+  document.querySelectorAll('.background-design-btn').forEach(button => {
+    const selected = button.dataset.design === backgroundDesign;
+    button.classList.toggle('selected', selected);
+    button.setAttribute('aria-pressed', String(selected));
+  });
+}
+
+function applyBackgroundDesign(key) {
+  if (!BACKGROUND_DESIGNS[key]) return;
+  backgroundDesign = key;
+  const design = currentBackgroundDesign();
+  if (design.baseColor) document.getElementById('base-color').value = design.baseColor;
+  syncBackgroundDesignButtons();
+  renderCanvas();
+}
+
+function drawBackgroundDesign(targetCtx, scale) {
+  for (const shape of currentBackgroundDesign().shapes) {
+    targetCtx.fillStyle = shape.color;
+    targetCtx.fillRect(shape.x * cardW * scale, shape.y * cardH * scale, shape.w * cardW * scale, shape.h * cardH * scale);
+  }
+}
+
+// ============================================================
 // カードサイズ
 // ============================================================
 function onCardSizeChange() {
@@ -477,6 +780,9 @@ function onCardSizeChange() {
 
 function applyTemplate(name) {
   selectedId = null;
+  selectedQuestionKeys = [];
+  questionAnswers = {};
+  backgroundDesign = 'plain';
   document.getElementById('properties-panel').classList.add('hidden');
   document.getElementById('base-color').value = '#ffffff';
 
@@ -489,6 +795,10 @@ function applyTemplate(name) {
     elements = createKidsElements();
   }
 
+  syncNameInput();
+  syncDreamInput();
+  syncBackgroundDesignButtons();
+  renderQuestionPicker();
   renderElementList();
   renderCanvas(true);
 }
@@ -531,6 +841,7 @@ function renderCanvas(recenter = false) {
 
   ctx.fillStyle = document.getElementById('base-color').value;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+  drawBackgroundDesign(ctx, renderScale);
 
   for (const el of elements) {
     if (el.type === 'qr') {
@@ -1002,7 +1313,18 @@ function updateSelectedProp(key, value) {
   const el = elements.find(e => e.id === selectedId);
   if (!el) return;
   el[key] = value;
-  if (key === 'text' && el.role === 'dream') syncDreamIllustration();
+  if (key === 'text' && el.role === 'name') syncNameInput();
+  if (key === 'text' && el.role === 'dream') {
+    syncDreamIllustration();
+    syncDreamInput();
+  }
+  if (key === 'text' && el.role === 'profile-question') {
+    const question = questionDefinition(el.questionKey);
+    questionAnswers[el.questionKey] = question && value.startsWith(`${question.label}：`)
+      ? value.slice(question.label.length + 1)
+      : value;
+    renderQuestionPicker();
+  }
   if (key === 'x') document.getElementById('prop-x').value = value;
   if (key === 'y') document.getElementById('prop-y').value = value;
   renderElementList();
@@ -1115,7 +1437,15 @@ async function onLogoFileInput(input) {
 }
 
 function deleteElement(id) {
+  const deleted = elements.find(el => el.id === id);
   elements = elements.filter(el => el.id !== id);
+  if (deleted?.role === 'profile-question') {
+    selectedQuestionKeys = selectedQuestionKeys.filter(key => key !== deleted.questionKey);
+    delete questionAnswers[deleted.questionKey];
+    renderQuestionPicker();
+  }
+  syncNameInput();
+  syncDreamInput();
   if (selectedId === id) {
     selectedId = null;
     document.getElementById('properties-panel').classList.add('hidden');
@@ -1744,10 +2074,27 @@ function douglasPeucker(pts, eps) {
 // ============================================================
 // エクスポート共通：全オブジェクトを生成
 // ============================================================
+function buildBackgroundObjects(baseT) {
+  const byColor = new Map();
+  for (const shape of currentBackgroundDesign().shapes) {
+    if (!byColor.has(shape.color)) byColor.set(shape.color, []);
+    byColor.get(shape.color).push(...boxTriangles(
+      shape.x * cardW, shape.y * cardH, baseT,
+      shape.w * cardW, shape.h * cardH, 0.2,
+    ));
+  }
+  return [...byColor].map(([color, tris], index) => ({
+    name: `background ${backgroundDesign} ${index + 1}`,
+    tris: flipY(tris),
+    color,
+  }));
+}
+
 function buildExportObjects() {
   const baseT = +(document.getElementById('base-thickness').value) || 0.8;
   const objs = [
     { name: 'base', tris: boxTriangles(0, 0, 0, cardW, cardH, baseT), color: document.getElementById('base-color').value },
+    ...buildBackgroundObjects(baseT),
   ];
   for (const el of elements) {
     if (el.type === 'image') {
@@ -1779,6 +2126,10 @@ function exportSVG() {
       `     viewBox="0 0 ${cardW} ${cardH}">`,
       `  <rect width="${cardW}" height="${cardH}" fill="${baseColor}"/>`,
     ];
+
+    for (const shape of currentBackgroundDesign().shapes) {
+      lines.push(`  <rect x="${f(shape.x * cardW)}" y="${f(shape.y * cardH)}" width="${f(shape.w * cardW)}" height="${f(shape.h * cardH)}" fill="${shape.color}"/>`);
+    }
 
     for (const el of elements) {
       const fontSize = (el.size * 0.353).toFixed(4);
@@ -1927,6 +2278,7 @@ function calcNormal(a, b, c) {
 // ============================================================
 async function export3MF() {
   try {
+    if (!validateRequiredProfile()) return;
     const rawObjs = buildExportObjects().filter(obj => obj.tris.length > 0);
 
     // 頂点重複排除してインデックスメッシュに変換
@@ -2107,6 +2459,7 @@ function downloadBlob(data, filename, mime) {
 // ============================================================
 // 初期化
 // ============================================================
+syncBackgroundDesignButtons();
 renderElementList();
 renderCanvas(true); // 初回は中央に配置
 window.addEventListener('resize', () => centerView());
