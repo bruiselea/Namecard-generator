@@ -935,6 +935,15 @@ function drawQRElement(targetCtx, el, scale) {
 }
 
 function drawImageElement(targetCtx, el, scale) {
+  if (el.role === 'photo' && el.sourceImage) {
+    const displayHeight = getElementHeight(el);
+    targetCtx.save();
+    targetCtx.imageSmoothingEnabled = true;
+    targetCtx.imageSmoothingQuality = 'high';
+    targetCtx.drawImage(el.sourceImage, el.x * scale, el.y * scale, el.size * scale, displayHeight * scale);
+    targetCtx.restore();
+    return;
+  }
   if (!el.pixels || !el.gridW || !el.gridH) return;
   const cell = el.size * scale / el.gridW;
   for (const p of el.pixels) {
@@ -1441,7 +1450,7 @@ async function rasterFileToPhotoElement(file) {
   return {
     id: uid(), role: 'photo', type: 'image', text: file.name,
     x: Math.max(2, cardW - displayWidth - 4), y: 4, size: displayWidth,
-    gridW, gridH, pixels, vectorGroups: [], bold: true,
+    gridW, gridH, pixels, sourceImage: image, vectorGroups: [], bold: true,
     color: pixels[0]?.color || '#111111', extrude: 0.3,
   };
 }
