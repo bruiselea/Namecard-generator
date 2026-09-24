@@ -18,9 +18,16 @@
     display: flex;
     align-items: center;
     gap: 16px;
+    flex-wrap: wrap;
   }
   header h1 { font-size: 16px; font-weight: 600; color: #fff; }
   header .spacer { flex: 1; }
+  .draft-actions { display: flex; gap: 6px; }
+  .draft-btn { padding: 6px 11px; border: 1px solid #555; border-radius: 5px; background: #2a2a2a; color: #ddd; cursor: pointer; }
+  .draft-btn:hover { border-color: #777; background: #333; }
+  .draft-status { color: #9ca3af; font-size: 11px; }
+  .draft-status.ok { color: #4ade80; }
+  .draft-status.error { color: #f87171; }
   button.export-btn {
     background: #2563eb;
     color: #fff;
@@ -250,6 +257,11 @@
 <header>
   <h1>名刺ジェネレーター</h1>
   <span id="font-badge" class="badge">canvasモード（フォント不要）</span>
+  <div class="draft-actions">
+    <button type="button" class="draft-btn" onclick="saveTemporaryDraft()">一時保存</button>
+    <button type="button" class="draft-btn" onclick="restoreTemporaryDraft()">復元</button>
+  </div>
+  <span class="draft-status" id="draft-status" aria-live="polite"></span>
   <div class="spacer"></div>
   <button class="export-btn green" onclick="openImageExport()">エクスポート</button>
 </header>
@@ -767,6 +779,91 @@ function validateRequiredProfile() {
     if (!input.reportValidity()) return false;
   }
   return true;
+}
+
+// ============================================================
+// ブラウザ内の一時保存
+// ============================================================
+const DRAFT_STORAGE_KEY = 'namecard-generator:draft:v1';
+
+function setDraftStatus(message, type = '') {
+  const status = document.getElementById('draft-status');
+  status.textContent = message;
+  status.className = `draft-status${type ? ` ${type}` : ''}`;
+}
+
+function saveTemporaryDraft() {
+  try {
+    const draft = {
+      version: 1,
+      savedAt: new Date().toISOString(),
+      elements: elements.map(({ sourceImage, ...element }) => element),
+      selectedQuestionKeys,
+      questionAnswers,
+      backgroundDesign,
+      cardSize: document.getElementById('card-size').value,
+      cardW: +document.getElementById('card-w').value || cardW,
+      cardH: +document.getElementById('card-h').value || cardH,
+      baseColor: document.getElementById('base-color').value,
+      baseThickness: document.getElementById('base-thickness').value,
+    };
+    localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
+    const savedTime = new Date(draft.savedAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+    setDraftStatus(`${savedTime} に保存しました`, 'ok');
+  } catch (error) {
+    console.error(error);
+    setDraftStatus('保存できませんでした', 'error');
+  }
+}
+
+function restoreTemporaryDraft() {
+  try {
+    const stored = localStorage.getItem(DRAFT_STORAGE_KEY);
+    if (!stored) {
+      setDraftStatus('保存データがありません', 'error');
+      return;
+    }
+    const draft = JSON.parse(stored);
+    if (draft?.version !== 1 || !Array.isArray(draft.elements)) throw new Error('保存データの形式が正しくありません');
+
+    elements = draft.elements.filter(element => element && typeof element === 'object').map(element => ({ ...element, id: element.id || uid() }));
+    selectedQuestionKeys = Array.isArray(draft.selectedQuestionKeys)
+      ? draft.selectedQuestionKeys.filter(key => PROFILE_QUESTIONS.some(question => question.key === key)).slice(0, REQUIRED_QUESTION_COUNT)
+      : [];
+    questionAnswers = draft.questionAnswers && typeof draft.questionAnswers === 'object' ? { ...draft.questionAnswers } : {};
+    backgroundDesign = BACKGROUND_DESIGNS[draft.backgroundDesign] ? draft.backgroundDesign : 'plain';
+
+    const width = Number(draft.cardW);
+    const height = Number(draft.cardH);
+    document.getElementById('card-w').value = Number.isFinite(width) && width >= 10 && width <= 200 ? width : 91;
+    document.getElementById('card-h').value = Number.isFinite(height) && height >= 10 && height <= 200 ? height : 55;
+    const cardSize = ['91x55', '89x51', 'custom'].includes(draft.cardSize) ? draft.cardSize : '91x55';
+    document.getElementById('card-size').value = cardSize;
+    document.getElementById('custom-size').style.display = cardSize === 'custom' ? '' : 'none';
+    if (/^#[0-9a-f]{6}$/i.test(draft.baseColor || '')) document.getElementById('base-color').value = draft.baseColor;
+    document.getElementById('base-thickness').value = draft.baseThickness || '0.8';
+
+    selectedId = null;
+    document.getElementById('properties-panel').classList.add('hidden');
+    syncNameInput();
+    syncDreamInput();
+    syncBackgroundDesignButtons();
+    renderQuestionPicker();
+    renderElementList();
+    renderCanvas(true);
+    setDraftStatus('保存内容を復元しました', 'ok');
+  } catch (error) {
+    console.error(error);
+    setDraftStatus('保存データを復元できませんでした', 'error');
+  }
+}
+
+function showDraftAvailability() {
+  try {
+    if (localStorage.getItem(DRAFT_STORAGE_KEY)) setDraftStatus('一時保存あり');
+  } catch (error) {
+    console.error(error);
+  }
 }
 
 elements = createKidsElements();
@@ -2643,6 +2740,7 @@ renderElementList();
 renderCanvas(true); // 初回は中央に配置
 window.addEventListener('resize', () => centerView());
 openSharedCardFromLink();
+showDraftAvailability();
 </script>
 </body>
 </html>
