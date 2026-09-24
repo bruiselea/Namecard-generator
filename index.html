@@ -331,6 +331,8 @@
       <input type="text" id="name-input" required aria-required="true" placeholder="例：やまだ たろう" oninput="updateNameFromInput(this.value)">
       <label for="dream-input"><span id="dream-label-text">しょうらいのゆめ</span><span class="required-mark">必須</span></label>
       <input type="text" id="dream-input" required aria-required="true" placeholder="例：おいしゃさん" oninput="updateDreamFromInput(this.value)">
+      <label for="message-input"><span id="message-label-text">ひとこと</span><span class="required-mark">必須</span></label>
+      <input type="text" id="message-input" required aria-required="true" placeholder="例：よろしくね" oninput="updateMessageFromInput(this.value)">
       <label>追加する質問<span class="required-mark">4つ選択</span></label>
       <div id="question-picker" class="question-picker" tabindex="-1"></div>
       <div id="question-count" class="question-count" aria-live="polite"></div>
@@ -713,16 +715,19 @@ const GRADE_MODES = {
   lower: {
     nameLabel: 'なまえ', namePrefix: 'なまえ',
     dreamLabel: 'しょうらいのゆめ', dreamPrefix: 'しょうらいのゆめ',
+    messageLabel: 'ひとこと', messagePrefix: 'ひとこと',
     answerPlaceholder: 'こたえを かいてね',
   },
   middle: {
     nameLabel: '名前', namePrefix: '名前',
     dreamLabel: 'しょうらいの夢', dreamPrefix: 'しょうらいの夢',
+    messageLabel: '一言', messagePrefix: '一言',
     answerPlaceholder: '答えを 入力',
   },
   upper: {
     nameLabel: '名前', namePrefix: '名前',
     dreamLabel: '将来の夢', dreamPrefix: '将来の夢',
+    messageLabel: '一言', messagePrefix: '一言',
     answerPlaceholder: '回答を入力',
   },
 };
@@ -732,10 +737,12 @@ const PROFILE_QUESTIONS = [
   { key: 'interest', labels: { lower: 'いま はまっていること', middle: '今 はまっていること', upper: '今ハマっていること' } },
   { key: 'million', labels: { lower: '100まんえん あったら なにする？', middle: '100万円あったら 何する？', upper: '100万円あったら何する？' } },
   { key: 'island', labels: { lower: 'むじんとうに なにか もっていくなら？', middle: '無人島に 何か もっていくなら？', upper: '無人島に何か持って行くなら？' } },
-  { key: 'admire', labels: { lower: 'あこがれの ひとは？', middle: 'あこがれの人は？', upper: '憧れの人は？' } },
-  { key: 'once', labels: { lower: 'いちどは やってみたいことは？', middle: '一度は やってみたいことは？', upper: '人生で一度はやってみたいことは？' } },
-  { key: 'country', labels: { lower: 'いきたい くには？', middle: '行きたい 国は？', upper: '行きたい国は？' } },
-  { key: 'food', labels: { lower: 'すきな りょうりは？', middle: '好きな 料理は？', upper: '好きな料理は？' } },
+  { key: 'memory', labels: { lower: 'いままでで いちばんの おもいで', middle: '今までで 一番の思い出', upper: '今までで一番の思い出' } },
+  { key: 'strength', labels: { lower: 'とくいなこと', middle: '得意なこと', upper: '得意なこと' } },
+  { key: 'admire', labels: { lower: 'あこがれの ひと', middle: 'あこがれの人', upper: '憧れの人' } },
+  { key: 'once', labels: { lower: 'いちどは やってみたいこと', middle: '一度は やってみたいこと', upper: '人生で一度はやってみたいこと' } },
+  { key: 'country', labels: { lower: 'いきたい くに', middle: '行きたい 国', upper: '行きたい国' } },
+  { key: 'food', labels: { lower: 'すきな りょうり', middle: '好きな 料理', upper: '好きな料理' } },
 ];
 const REQUIRED_QUESTION_COUNT = 4;
 let selectedQuestionKeys = [];
@@ -747,8 +754,27 @@ function createKidsElements() {
   return [
     { id: uid(), role: 'name', type: 'text', text: `${mode.namePrefix}：`, x: 6, y: 10, size: 12, bold: true, color: '#111111', extrude: 0.5 },
     dream,
+    createMessageElement(),
     createDreamIllustrationElement(dream.text),
   ];
+}
+
+function createMessageElement() {
+  const mode = currentGradeMode();
+  return { id: uid(), role: 'message', type: 'text', text: `${mode.messagePrefix}：`, x: 6, y: 27, size: 5.5, bold: true, color: '#444444', extrude: 0.3 };
+}
+
+function ensureMessageElement() {
+  if (elements.some(el => el.role === 'dream') && !elements.some(el => el.role === 'message')) {
+    const illustrationIndex = elements.findIndex(el => el.role === 'dream-illustration');
+    const message = createMessageElement();
+    if (illustrationIndex >= 0) elements.splice(illustrationIndex, 0, message);
+    else elements.push(message);
+    selectedQuestionKeys.forEach((key, index) => {
+      const question = elements.find(el => el.role === 'profile-question' && el.questionKey === key);
+      if (question) question.y = 34 + index * 5.2;
+    });
+  }
 }
 
 function getDreamArt(text) {
@@ -790,6 +816,10 @@ function nameAnswer(text) {
   return String(text || '').replace(/^(?:なまえ|名前)[：:]\s*/, '');
 }
 
+function messageAnswer(text) {
+  return String(text || '').replace(/^(?:ひとこと|一言)[：:]\s*/, '');
+}
+
 function currentGradeMode() {
   return GRADE_MODES[gradeMode] || GRADE_MODES.lower;
 }
@@ -807,8 +837,10 @@ function syncGradeModeUI() {
   });
   document.getElementById('name-label-text').textContent = mode.nameLabel;
   document.getElementById('dream-label-text').textContent = mode.dreamLabel;
+  document.getElementById('message-label-text').textContent = mode.messageLabel;
   document.getElementById('name-input').placeholder = gradeMode === 'lower' ? '例：ゆうき' : '例：ゆうき';
   document.getElementById('dream-input').placeholder = gradeMode === 'lower' ? '例：おいしゃさん' : '例：医者';
+  document.getElementById('message-input').placeholder = gradeMode === 'lower' ? '例：よろしくね' : '例：よろしくお願いします';
 }
 
 function syncNameInput() {
@@ -826,6 +858,15 @@ function syncDreamInput() {
   input.disabled = !dream;
   input.required = !!dream;
   input.value = dream ? dreamAnswer(dream.text) : '';
+  input.setCustomValidity('');
+}
+
+function syncMessageInput() {
+  const input = document.getElementById('message-input');
+  const message = elements.find(el => el.role === 'message');
+  input.disabled = !message;
+  input.required = !!message;
+  input.value = message ? messageAnswer(message.text) : '';
   input.setCustomValidity('');
 }
 
@@ -850,6 +891,16 @@ function updateDreamFromInput(value) {
   renderCanvas();
 }
 
+function updateMessageFromInput(value) {
+  const message = elements.find(el => el.role === 'message');
+  if (!message) return;
+  document.getElementById('message-input').setCustomValidity('');
+  message.text = `${currentGradeMode().messagePrefix}：${value}`;
+  if (selectedId === message.id) document.getElementById('prop-text').value = message.text;
+  renderElementList();
+  renderCanvas();
+}
+
 function questionDefinition(key) {
   return PROFILE_QUESTIONS.find(question => question.key === key);
 }
@@ -866,7 +917,7 @@ function syncQuestionElements() {
     elements.push({
       id: previous?.id || uid(), role: 'profile-question', questionKey: key, type: 'text',
       text: `${questionLabel(question)}：${questionAnswers[key] || ''}`,
-      x: previous?.x ?? 6, y: previous?.y ?? 28 + index * 6.5,
+      x: previous?.x ?? 6, y: previous?.y ?? 34 + index * 5.2,
       size: previous?.size ?? 5, bold: previous?.bold ?? true,
       color: previous?.color || '#444444', extrude: previous?.extrude ?? 0.3,
     });
@@ -953,6 +1004,7 @@ function validateRequiredProfile() {
   const fields = [
     { role: 'name', inputId: 'name-input', label: '名前' },
     { role: 'dream', inputId: 'dream-input', label: '将来の夢' },
+    { role: 'message', inputId: 'message-input', label: '一言' },
   ];
   for (const field of fields) {
     if (!elements.some(el => el.role === field.role)) continue;
@@ -1053,6 +1105,8 @@ function restoreTemporaryDraft({ automatic = false } = {}) {
     backgroundDesign = BACKGROUND_DESIGNS[draft.backgroundDesign] ? draft.backgroundDesign : 'plain';
     selectedFontKey = FONT_OPTIONS[draft.selectedFontKey] ? draft.selectedFontKey : 'gothic';
     gradeMode = GRADE_MODES[draft.gradeMode] ? draft.gradeMode : 'lower';
+    ensureMessageElement();
+    syncQuestionElements();
 
     const width = Number(draft.cardW);
     const height = Number(draft.cardH);
@@ -1073,6 +1127,7 @@ function restoreTemporaryDraft({ automatic = false } = {}) {
     syncGradeModeUI();
     syncNameInput();
     syncDreamInput();
+    syncMessageInput();
     syncBackgroundDesignButtons();
     renderQuestionPicker();
     renderElementList();
@@ -1109,6 +1164,7 @@ function clearEditorContent() {
   syncGradeModeUI();
   syncNameInput();
   syncDreamInput();
+  syncMessageInput();
   syncBackgroundDesignButtons();
   renderQuestionPicker();
   renderElementList();
@@ -1194,6 +1250,7 @@ function applyTemplate(mode = 'lower') {
   syncGradeModeUI();
   syncNameInput();
   syncDreamInput();
+  syncMessageInput();
   syncBackgroundDesignButtons();
   renderQuestionPicker();
   renderElementList();
@@ -1676,12 +1733,13 @@ function renderElementList() {
     const item = document.createElement('div');
     item.className = 'element-item' + (el.id === selectedId ? ' selected' : '');
     const label = el.type === 'qr' ? `QR: ${el.text}` : el.role === 'photo' ? `写真: ${el.text}` : el.role === 'dream-illustration' ? `ゆめのイラスト: ${el.text}` : el.type === 'image' ? `ロゴ: ${el.text}` : el.text;
+    const deleteButton = el.role === 'message' ? '' : `<button class="del-btn" data-id="${el.id}">✕</button>`;
     item.innerHTML = `
       <span class="color-dot" style="background:${el.color}"></span>
       <span class="elabel">${escHtml(label)}</span>
-      <button class="del-btn" data-id="${el.id}">✕</button>
+      ${deleteButton}
     `;
-    item.querySelector('.del-btn').addEventListener('click', e => { e.stopPropagation(); deleteElement(el.id); });
+    item.querySelector('.del-btn')?.addEventListener('click', e => { e.stopPropagation(); deleteElement(el.id); });
     item.addEventListener('click', () => selectElement(el.id));
     container.appendChild(item);
   }
@@ -1725,6 +1783,7 @@ function updateSelectedProp(key, value) {
   if (!el) return;
   el[key] = value;
   if (key === 'text' && el.role === 'name') syncNameInput();
+  if (key === 'text' && el.role === 'message') syncMessageInput();
   if (key === 'text' && el.role === 'dream') {
     syncDreamIllustration();
     syncDreamInput();
@@ -1870,6 +1929,7 @@ async function onLogoFileInput(input) {
 
 function deleteElement(id) {
   const deleted = elements.find(el => el.id === id);
+  if (deleted?.role === 'message') return;
   elements = elements.filter(el => el.id !== id);
   if (deleted?.role === 'profile-question') {
     selectedQuestionKeys = selectedQuestionKeys.filter(key => key !== deleted.questionKey);
@@ -1878,6 +1938,7 @@ function deleteElement(id) {
   }
   syncNameInput();
   syncDreamInput();
+  syncMessageInput();
   if (selectedId === id) {
     selectedId = null;
     document.getElementById('properties-panel').classList.add('hidden');
