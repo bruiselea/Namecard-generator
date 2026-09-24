@@ -80,7 +80,7 @@
     padding: 2px;
   }
   .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .template-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .template-grid { display: grid; grid-template-columns: 1fr; gap: 8px; }
   .template-btn {
     background: #2a2a2a;
     border: 1px solid #444;
@@ -91,21 +91,6 @@
     cursor: pointer;
   }
   .template-btn:hover { border-color: #666; background: #333; }
-
-  /* フォントドロップゾーン */
-  .font-drop {
-    border: 1px dashed #555;
-    border-radius: 4px;
-    padding: 10px 12px;
-    text-align: center;
-    font-size: 12px;
-    color: #888;
-    cursor: pointer;
-    transition: border-color 0.15s, background 0.15s;
-  }
-  .font-drop:hover, .font-drop.dragover { border-color: #2563eb; background: #1a2a3a; color: #bbb; }
-  .font-status { margin-top: 5px; font-size: 11px; color: #f59e0b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .font-status.loaded { color: #4ade80; }
 
   button.add-btn {
     width: 100%;
@@ -270,9 +255,12 @@
       display: inline-flex; width: 100%; min-height: 48px; margin-top: 20px;
       align-items: center; justify-content: center; font-weight: 600;
     }
-    header { padding: 10px 12px; gap: 8px; }
+    header { padding: 10px 12px; gap: 8px; flex-wrap: wrap; }
     header h1 { flex: 1; font-size: 15px; }
     header .badge, header .spacer { display: none; }
+    header .draft-actions { order: 3; width: 100%; display: grid; grid-template-columns: repeat(3, 1fr); }
+    header .draft-btn { min-height: 44px; padding: 8px 6px; }
+    header .draft-status { order: 4; width: 100%; }
     button.export-btn { min-height: 44px; padding: 10px 14px; }
 
     .main { flex: none; flex-direction: column; overflow: visible; }
@@ -290,7 +278,6 @@
     }
     input[type="text"], input[type="number"], select { padding: 10px; font-size: 16px; }
     input[type="color"] { height: 44px; }
-    .font-drop { min-height: 48px; padding: 14px 12px; }
     .question-option { min-height: 44px; padding: 10px; align-items: center; }
     .question-option input { width: 18px; height: 18px; margin-top: 0; }
     .element-item .del-btn { min-width: 44px; min-height: 44px; font-size: 18px; }
@@ -312,6 +299,7 @@
   <div class="draft-actions">
     <button type="button" class="draft-btn" onclick="saveTemporaryDraft()">一時保存</button>
     <button type="button" class="draft-btn" onclick="restoreTemporaryDraft()">復元</button>
+    <button type="button" class="draft-btn" onclick="clearEditorContent()">内容をクリア</button>
   </div>
   <span class="draft-status" id="draft-status" aria-live="polite"></span>
   <div class="spacer"></div>
@@ -324,8 +312,7 @@
     <div class="panel-section">
       <h2>テンプレート</h2>
       <div class="template-grid">
-        <button class="template-btn" onclick="applyTemplate('business')">なまえ + ゆめ</button>
-        <button class="template-btn" onclick="applyTemplate('qr-logo')">ロゴ + QR</button>
+        <button class="template-btn" onclick="applyTemplate()">なまえ + ゆめ</button>
       </div>
     </div>
 
@@ -345,11 +332,12 @@
     <!-- フォント -->
     <div class="panel-section">
       <h2>フォント</h2>
-      <div class="font-drop" id="font-drop" onclick="document.getElementById('font-file').click()">
-        TTF / OTF をドロップ or クリック
-        <div class="font-status" id="font-status">未読み込み（バウンディングボックス近似）</div>
-      </div>
-      <input type="file" id="font-file" accept=".ttf,.otf" style="display:none" onchange="onFontFileInput(this)">
+      <label for="font-select">文字の種類</label>
+      <select id="font-select" onchange="applyFontSelection(this.value)">
+        <option value="gothic">ゴシック</option>
+        <option value="rounded">まる文字</option>
+        <option value="mincho">明朝</option>
+      </select>
     </div>
 
     <!-- カード設定 -->
@@ -375,7 +363,7 @@
         </div>
       </div>
       <label>ベースの厚み(mm)</label>
-      <input type="number" id="base-thickness" value="0.8" min="0.2" max="5" step="0.1">
+      <input type="number" id="base-thickness" value="0.8" min="0.2" max="5" step="0.1" oninput="scheduleAutoSave()">
       <label>ベースの色</label>
       <input type="color" id="base-color" value="#ffffff" oninput="renderCanvas()">
     </div>
@@ -386,8 +374,8 @@
       <div id="element-list-container"></div>
       <button class="add-btn" onclick="addElement()">＋ テキストを追加</button>
       <button class="add-btn" onclick="addQRElement()">＋ QRを追加</button>
-      <button class="add-btn" onclick="document.getElementById('photo-file').click()">＋ 写真を追加</button>
-      <input type="file" id="photo-file" accept="image/png,image/jpeg,image/webp,image/svg+xml" style="display:none" onchange="onPhotoFileInput(this)">
+      <button class="add-btn" onclick="document.getElementById('photo-file').click()">＋ 写真・画像を追加</button>
+      <input type="file" id="photo-file" accept="image/*" style="display:none" onchange="onPhotoFileInput(this)">
     </div>
 
     <!-- 選択要素プロパティ -->
@@ -469,6 +457,29 @@ let selectedId = null;
 let dragState = null;
 let loadedFont = null;
 let backgroundDesign = 'plain';
+let selectedFontKey = 'gothic';
+
+const FONT_OPTIONS = {
+  gothic: {
+    label: 'ゴシック',
+    canvas: 'system-ui, sans-serif',
+    svg: 'system-ui, sans-serif',
+  },
+  rounded: {
+    label: 'まる文字',
+    canvas: 'ui-rounded, "Hiragino Maru Gothic ProN", "Arial Rounded MT Bold", sans-serif',
+    svg: 'ui-rounded, Hiragino Maru Gothic ProN, Arial Rounded MT Bold, sans-serif',
+  },
+  mincho: {
+    label: '明朝',
+    canvas: 'ui-serif, "Hiragino Mincho ProN", "Yu Mincho", serif',
+    svg: 'ui-serif, Hiragino Mincho ProN, Yu Mincho, serif',
+  },
+};
+
+function currentFontOption() {
+  return FONT_OPTIONS[selectedFontKey] || FONT_OPTIONS.gothic;
+}
 
 const BACKGROUND_DESIGNS = {
   plain: { label: '無柄・色のみ', baseColor: null, shapes: [] },
@@ -843,6 +854,8 @@ function validateRequiredProfile() {
 // ブラウザ内の一時保存
 // ============================================================
 const DRAFT_STORAGE_KEY = 'namecard-generator:draft:v1';
+let autoSaveEnabled = false;
+let autoSaveTimer = null;
 
 function setDraftStatus(message, type = '') {
   const status = document.getElementById('draft-status');
@@ -850,46 +863,67 @@ function setDraftStatus(message, type = '') {
   status.className = `draft-status${type ? ` ${type}` : ''}`;
 }
 
-function saveTemporaryDraft() {
+function createDraftSnapshot() {
+  return {
+    version: 1,
+    savedAt: new Date().toISOString(),
+    elements: elements.map(({ sourceImage, ...element }) => element),
+    selectedQuestionKeys,
+    questionAnswers,
+    backgroundDesign,
+    selectedFontKey,
+    cardSize: document.getElementById('card-size').value,
+    cardW: +document.getElementById('card-w').value || cardW,
+    cardH: +document.getElementById('card-h').value || cardH,
+    baseColor: document.getElementById('base-color').value,
+    baseThickness: document.getElementById('base-thickness').value,
+  };
+}
+
+function persistDraft(showStatus = false) {
   try {
-    const draft = {
-      version: 1,
-      savedAt: new Date().toISOString(),
-      elements: elements.map(({ sourceImage, ...element }) => element),
-      selectedQuestionKeys,
-      questionAnswers,
-      backgroundDesign,
-      cardSize: document.getElementById('card-size').value,
-      cardW: +document.getElementById('card-w').value || cardW,
-      cardH: +document.getElementById('card-h').value || cardH,
-      baseColor: document.getElementById('base-color').value,
-      baseThickness: document.getElementById('base-thickness').value,
-    };
+    const draft = createDraftSnapshot();
     localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
-    const savedTime = new Date(draft.savedAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
-    setDraftStatus(`${savedTime} に保存しました`, 'ok');
+    if (showStatus) {
+      const savedTime = new Date(draft.savedAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+      setDraftStatus(`${savedTime} に保存しました`, 'ok');
+    }
+    return true;
   } catch (error) {
     console.error(error);
     setDraftStatus('保存できませんでした', 'error');
+    return false;
   }
 }
 
-function restoreTemporaryDraft() {
+function saveTemporaryDraft() {
+  persistDraft(true);
+}
+
+function scheduleAutoSave() {
+  if (!autoSaveEnabled) return;
+  clearTimeout(autoSaveTimer);
+  autoSaveTimer = setTimeout(() => persistDraft(false), 300);
+}
+
+function restoreTemporaryDraft({ automatic = false } = {}) {
   try {
     const stored = localStorage.getItem(DRAFT_STORAGE_KEY);
     if (!stored) {
-      setDraftStatus('保存データがありません', 'error');
-      return;
+      if (!automatic) setDraftStatus('保存データがありません', 'error');
+      return false;
     }
     const draft = JSON.parse(stored);
     if (draft?.version !== 1 || !Array.isArray(draft.elements)) throw new Error('保存データの形式が正しくありません');
 
     elements = draft.elements.filter(element => element && typeof element === 'object').map(element => ({ ...element, id: element.id || uid() }));
+    restorePhotoSourceImages();
     selectedQuestionKeys = Array.isArray(draft.selectedQuestionKeys)
       ? draft.selectedQuestionKeys.filter(key => PROFILE_QUESTIONS.some(question => question.key === key)).slice(0, REQUIRED_QUESTION_COUNT)
       : [];
     questionAnswers = draft.questionAnswers && typeof draft.questionAnswers === 'object' ? { ...draft.questionAnswers } : {};
     backgroundDesign = BACKGROUND_DESIGNS[draft.backgroundDesign] ? draft.backgroundDesign : 'plain';
+    selectedFontKey = FONT_OPTIONS[draft.selectedFontKey] ? draft.selectedFontKey : 'gothic';
 
     const width = Number(draft.cardW);
     const height = Number(draft.cardH);
@@ -900,6 +934,10 @@ function restoreTemporaryDraft() {
     document.getElementById('custom-size').style.display = cardSize === 'custom' ? '' : 'none';
     if (/^#[0-9a-f]{6}$/i.test(draft.baseColor || '')) document.getElementById('base-color').value = draft.baseColor;
     document.getElementById('base-thickness').value = draft.baseThickness || '0.8';
+    document.getElementById('font-select').value = selectedFontKey;
+    const badge = document.getElementById('font-badge');
+    badge.textContent = currentFontOption().label;
+    badge.className = 'badge ok';
 
     selectedId = null;
     document.getElementById('properties-panel').classList.add('hidden');
@@ -909,56 +947,58 @@ function restoreTemporaryDraft() {
     renderQuestionPicker();
     renderElementList();
     renderCanvas(true);
-    setDraftStatus('保存内容を復元しました', 'ok');
+    setDraftStatus(automatic ? '前回の内容を自動復元しました' : '保存内容を復元しました', 'ok');
+    return true;
   } catch (error) {
     console.error(error);
     setDraftStatus('保存データを復元できませんでした', 'error');
+    return false;
   }
 }
 
-function showDraftAvailability() {
-  try {
-    if (localStorage.getItem(DRAFT_STORAGE_KEY)) setDraftStatus('一時保存あり');
-  } catch (error) {
-    console.error(error);
-  }
+function clearEditorContent() {
+  if (!confirm('入力内容と保存内容をすべてクリアしますか？')) return;
+  clearTimeout(autoSaveTimer);
+  localStorage.removeItem(DRAFT_STORAGE_KEY);
+  selectedId = null;
+  selectedQuestionKeys = [];
+  questionAnswers = {};
+  backgroundDesign = 'plain';
+  selectedFontKey = 'gothic';
+  elements = createKidsElements();
+  document.getElementById('properties-panel').classList.add('hidden');
+  document.getElementById('card-size').value = '91x55';
+  document.getElementById('card-w').value = 91;
+  document.getElementById('card-h').value = 55;
+  document.getElementById('custom-size').style.display = 'none';
+  document.getElementById('base-color').value = '#ffffff';
+  document.getElementById('base-thickness').value = '0.8';
+  document.getElementById('font-select').value = selectedFontKey;
+  document.getElementById('font-badge').textContent = currentFontOption().label;
+  syncNameInput();
+  syncDreamInput();
+  syncBackgroundDesignButtons();
+  renderQuestionPicker();
+  renderElementList();
+  renderCanvas(true);
+  persistDraft(false);
+  setDraftStatus('内容をクリアしました', 'ok');
 }
 
 elements = createKidsElements();
 renderQuestionPicker();
 
 // ============================================================
-// フォント読み込み
+// フォント選択
 // ============================================================
-async function onFontFileInput(input) {
-  if (!input.files[0]) return;
-  await loadFontFromFile(input.files[0]);
+function applyFontSelection(key) {
+  selectedFontKey = FONT_OPTIONS[key] ? key : 'gothic';
+  document.getElementById('font-select').value = selectedFontKey;
+  const badge = document.getElementById('font-badge');
+  badge.textContent = currentFontOption().label;
+  badge.className = 'badge ok';
+  renderCanvas();
 }
-
-async function loadFontFromFile(file) {
-  try {
-    const buffer = await file.arrayBuffer();
-    loadedFont = opentype.parse(buffer);
-    const statusEl = document.getElementById('font-status');
-    statusEl.textContent = file.name;
-    statusEl.className = 'font-status loaded';
-    const badge = document.getElementById('font-badge');
-    badge.textContent = 'フォント読込済';
-    badge.className = 'badge ok';
-  } catch(e) {
-    alert('フォントの読み込みに失敗しました: ' + e.message);
-  }
-}
-
-const fontDrop = document.getElementById('font-drop');
-fontDrop.addEventListener('dragover', e => { e.preventDefault(); fontDrop.classList.add('dragover'); });
-fontDrop.addEventListener('dragleave', () => fontDrop.classList.remove('dragover'));
-fontDrop.addEventListener('drop', async e => {
-  e.preventDefault();
-  fontDrop.classList.remove('dragover');
-  const file = e.dataTransfer.files[0];
-  if (file) await loadFontFromFile(file);
-});
 
 // ============================================================
 // 背景デザイン
@@ -1008,7 +1048,7 @@ function onCardSizeChange() {
   }
 }
 
-function applyTemplate(name) {
+function applyTemplate() {
   selectedId = null;
   selectedQuestionKeys = [];
   questionAnswers = {};
@@ -1016,14 +1056,7 @@ function applyTemplate(name) {
   document.getElementById('properties-panel').classList.add('hidden');
   document.getElementById('base-color').value = '#ffffff';
 
-  if (name === 'qr-logo') {
-    elements = [
-      { id: uid(), type: 'text', text: 'LOGO', x: 8, y: 25, size: 22, bold: true, color: '#111111', extrude: 0.6 },
-      { id: uid(), type: 'qr', text: 'https://example.com', x: 56, y: 11, size: 33, bold: true, color: '#111111', extrude: 0.5 },
-    ];
-  } else {
-    elements = createKidsElements();
-  }
+  elements = createKidsElements();
 
   syncNameInput();
   syncDreamInput();
@@ -1051,7 +1084,7 @@ function drawCardContent(targetCtx, scale) {
       drawImageElement(targetCtx, el, scale);
     } else {
       const px = el.size * scale * 0.353;
-      targetCtx.font = `${el.bold ? 'bold ' : ''}${px}px system-ui, sans-serif`;
+      targetCtx.font = `${el.bold ? 'bold ' : ''}${px}px ${currentFontOption().canvas}`;
       targetCtx.fillStyle = el.color;
       targetCtx.fillText(el.text, el.x * scale, el.y * scale);
     }
@@ -1101,13 +1134,14 @@ function renderCanvas(recenter = false) {
         ctx.strokeRect(el.x * renderScale - 2 * dpr, el.y * renderScale - 2 * dpr, el.size * renderScale + 4 * dpr, h * renderScale + 4 * dpr);
       } else {
         const px = el.size * renderScale * 0.353;
-        ctx.font = `${el.bold ? 'bold ' : ''}${px}px system-ui, sans-serif`;
+        ctx.font = `${el.bold ? 'bold ' : ''}${px}px ${currentFontOption().canvas}`;
         const w = ctx.measureText(el.text).width;
         ctx.strokeRect(el.x * renderScale - 2 * dpr, el.y * renderScale - px - 1 * dpr, w + 4 * dpr, px + 5 * dpr);
       }
       ctx.setLineDash([]);
     }
   }
+  scheduleAutoSave();
 }
 
 function drawQRElement(targetCtx, el, scale) {
@@ -1615,6 +1649,15 @@ async function onPhotoFileInput(input) {
 
 async function rasterFileToPhotoElement(file) {
   const image = await loadLocalImage(file);
+  const sourceScale = Math.min(1, 800 / Math.max(image.naturalWidth, image.naturalHeight));
+  const sourceCanvas = document.createElement('canvas');
+  sourceCanvas.width = Math.max(1, Math.round(image.naturalWidth * sourceScale));
+  sourceCanvas.height = Math.max(1, Math.round(image.naturalHeight * sourceScale));
+  const sourceCtx = sourceCanvas.getContext('2d');
+  sourceCtx.imageSmoothingEnabled = true;
+  sourceCtx.imageSmoothingQuality = 'high';
+  sourceCtx.drawImage(image, 0, 0, sourceCanvas.width, sourceCanvas.height);
+  const sourceDataUrl = sourceCanvas.toDataURL('image/webp', 0.84);
   const targetCells = 32;
   const scale = targetCells / Math.max(image.naturalWidth, image.naturalHeight);
   const gridW = Math.max(1, Math.round(image.naturalWidth * scale));
@@ -1639,9 +1682,20 @@ async function rasterFileToPhotoElement(file) {
   return {
     id: uid(), role: 'photo', type: 'image', text: file.name,
     x: Math.max(2, cardW - displayWidth - 4), y: 4, size: displayWidth,
-    gridW, gridH, pixels, sourceImage: image, vectorGroups: [], bold: true,
+    gridW, gridH, pixels, sourceImage: image, sourceDataUrl, vectorGroups: [], bold: true,
     color: pixels[0]?.color || '#111111', extrude: 0.3,
   };
+}
+
+function restorePhotoSourceImages() {
+  for (const element of elements.filter(el => el.role === 'photo' && el.sourceDataUrl)) {
+    const image = new Image();
+    image.onload = () => {
+      element.sourceImage = image;
+      renderCanvas();
+    };
+    image.src = element.sourceDataUrl;
+  }
 }
 
 function loadLocalImage(file) {
@@ -1713,7 +1767,7 @@ canvas.addEventListener('pointerdown', e => {
       inside = mx >= el.x - 1 && mx <= el.x + el.size + 1 && my >= el.y - 1 && my <= el.y + getElementHeight(el) + 1;
     } else {
       const px = el.size * renderScale * 0.353;
-      ctx.font = `${el.bold ? 'bold ' : ''}${px}px system-ui, sans-serif`;
+      ctx.font = `${el.bold ? 'bold ' : ''}${px}px ${currentFontOption().canvas}`;
       const w = ctx.measureText(el.text).width / renderScale;
       const h = el.size * 0.353;
       inside = mx >= el.x - 1 && mx <= el.x + w + 1 && my >= el.y - h - 1 && my <= el.y + 2;
@@ -2139,7 +2193,7 @@ function makeTextRasterMask(el, useLoadedFont = !!loadedFont, pxPerMM = 80) {
     tc.fillStyle = 'white';
     tc.fill('evenodd');
   } else {
-    const fontStr = `${el.bold ? 'bold ' : ''}${fontPx}px system-ui, sans-serif`;
+    const fontStr = `${el.bold ? 'bold ' : ''}${fontPx}px ${currentFontOption().canvas}`;
     tc.font = fontStr;
     const met = tc.measureText(el.text);
 
@@ -2397,7 +2451,7 @@ function exportSVG() {
       } else {
         // <text> 要素（システムフォント依存だが完全ベクター）
         const bold = el.bold ? ' font-weight="bold"' : '';
-        lines.push(`  <text x="${el.x}" y="${el.y}" font-size="${fontSize}"${bold} fill="${el.color}" font-family="system-ui, sans-serif">${escSvg(el.text)}</text>`);
+        lines.push(`  <text x="${el.x}" y="${el.y}" font-size="${fontSize}"${bold} fill="${el.color}" font-family="${currentFontOption().svg}">${escSvg(el.text)}</text>`);
       }
     }
 
@@ -2797,12 +2851,19 @@ function downloadBlob(data, filename, mime) {
 // ============================================================
 // 初期化
 // ============================================================
+document.getElementById('font-select').value = selectedFontKey;
+document.getElementById('font-badge').textContent = currentFontOption().label;
+document.getElementById('font-badge').className = 'badge ok';
 syncBackgroundDesignButtons();
 renderElementList();
 renderCanvas(true); // 初回は中央に配置
 window.addEventListener('resize', () => centerView());
-openSharedCardFromLink();
-showDraftAvailability();
+const isSharedCardView = openSharedCardFromLink();
+if (!isSharedCardView) {
+  restoreTemporaryDraft({ automatic: true });
+  autoSaveEnabled = true;
+  scheduleAutoSave();
+}
 </script>
 </body>
 </html>
