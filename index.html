@@ -203,6 +203,12 @@
     <!-- フォント -->
     <div class="panel-section">
       <h2>フォント</h2>
+      <label>プリセット</label>
+      <select id="font-preset" onchange="onFontPresetChange()">
+        <option value="gothic">ゴシック体</option>
+        <option value="rounded">丸ゴシック体</option>
+        <option value="mincho">明朝体</option>
+      </select>
       <div class="font-drop" id="font-drop" onclick="document.getElementById('font-file').click()">
         TTF / OTF をドロップ or クリック
         <div class="font-status" id="font-status">未読み込み（バウンディングボックス近似）</div>
@@ -284,6 +290,21 @@ let cardW = 91, cardH = 55;
 let selectedId = null;
 let dragState = null;
 let loadedFont = null;
+let selectedFontPreset = 'gothic';
+
+const FONT_PRESETS = {
+  gothic: '"Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif',
+  rounded: 'ui-rounded, "Hiragino Maru Gothic ProN", "Yu Gothic", Meiryo, sans-serif',
+  mincho: '"Hiragino Mincho ProN", "Yu Mincho", serif',
+};
+
+function selectedFontFamily() {
+  return FONT_PRESETS[selectedFontPreset] || FONT_PRESETS.gothic;
+}
+
+function canvasFont(el, px) {
+  return `${el.bold ? 'bold ' : ''}${px}px ${selectedFontFamily()}`;
+}
 
 // ビュー変換
 let viewZoom = 1;
@@ -428,6 +449,11 @@ elements = createKidsElements();
 // ============================================================
 // フォント読み込み
 // ============================================================
+function onFontPresetChange() {
+  selectedFontPreset = document.getElementById('font-preset').value;
+  renderCanvas();
+}
+
 async function onFontFileInput(input) {
   if (!input.files[0]) return;
   await loadFontFromFile(input.files[0]);
@@ -539,7 +565,7 @@ function renderCanvas(recenter = false) {
       drawImageElement(ctx, el, renderScale);
     } else {
       const px = el.size * renderScale * 0.353;
-      ctx.font = `${el.bold ? 'bold ' : ''}${px}px system-ui, sans-serif`;
+      ctx.font = canvasFont(el, px);
       ctx.fillStyle = el.color;
       ctx.fillText(el.text, el.x * renderScale, el.y * renderScale);
     }
@@ -556,7 +582,7 @@ function renderCanvas(recenter = false) {
         ctx.strokeRect(el.x * renderScale - 2 * dpr, el.y * renderScale - 2 * dpr, el.size * renderScale + 4 * dpr, h * renderScale + 4 * dpr);
       } else {
         const px = el.size * renderScale * 0.353;
-        ctx.font = `${el.bold ? 'bold ' : ''}${px}px system-ui, sans-serif`;
+        ctx.font = canvasFont(el, px);
         const w = ctx.measureText(el.text).width;
         ctx.strokeRect(el.x * renderScale - 2 * dpr, el.y * renderScale - px - 1 * dpr, w + 4 * dpr, px + 5 * dpr);
       }
@@ -1139,7 +1165,7 @@ canvas.addEventListener('mousedown', e => {
       inside = mx >= el.x - 1 && mx <= el.x + el.size + 1 && my >= el.y - 1 && my <= el.y + getElementHeight(el) + 1;
     } else {
       const px = el.size * renderScale * 0.353;
-      ctx.font = `${el.bold ? 'bold ' : ''}${px}px system-ui, sans-serif`;
+      ctx.font = canvasFont(el, px);
       const w = ctx.measureText(el.text).width / renderScale;
       const h = el.size * 0.353;
       inside = mx >= el.x - 1 && mx <= el.x + w + 1 && my >= el.y - h - 1 && my <= el.y + 2;
@@ -1562,7 +1588,7 @@ function makeTextRasterMask(el, useLoadedFont = !!loadedFont, pxPerMM = 80) {
     tc.fillStyle = 'white';
     tc.fill('evenodd');
   } else {
-    const fontStr = `${el.bold ? 'bold ' : ''}${fontPx}px system-ui, sans-serif`;
+    const fontStr = canvasFont(el, fontPx);
     tc.font = fontStr;
     const met = tc.measureText(el.text);
 
@@ -1799,7 +1825,7 @@ function exportSVG() {
       } else {
         // <text> 要素（システムフォント依存だが完全ベクター）
         const bold = el.bold ? ' font-weight="bold"' : '';
-        lines.push(`  <text x="${el.x}" y="${el.y}" font-size="${fontSize}"${bold} fill="${el.color}" font-family="system-ui, sans-serif">${escSvg(el.text)}</text>`);
+        lines.push(`  <text x="${el.x}" y="${el.y}" font-size="${fontSize}"${bold} fill="${el.color}" font-family="${escSvg(selectedFontFamily())}">${escSvg(el.text)}</text>`);
       }
     }
 
