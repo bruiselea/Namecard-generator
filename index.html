@@ -241,7 +241,13 @@
   .shared-card-content h1 { margin-bottom: 8px; color: #fff; font-size: 24px; }
   .shared-card-content p { margin-bottom: 22px; color: #9ca3af; }
   .shared-card-image { display: block; width: 100%; height: auto; border-radius: 8px; box-shadow: 0 24px 70px rgba(0,0,0,0.55); }
-  .shared-card-download { display: inline-block; margin-top: 22px; padding: 10px 20px; border-radius: 6px; background: #16a34a; color: #fff; text-decoration: none; }
+  .shared-card-actions { display: flex; justify-content: center; gap: 10px; margin-top: 22px; }
+  .shared-card-download {
+    display: inline-flex; align-items: center; justify-content: center; padding: 10px 20px;
+    border: 0; border-radius: 6px; background: #16a34a; color: #fff; font: inherit; text-decoration: none; cursor: pointer;
+  }
+  .shared-card-photo-save { background: #2563eb; }
+  .shared-card-save-hint { min-height: 1.5em; margin: 10px 0 0 !important; font-size: 12px; }
 
   @media (max-width: 720px) {
     body:not(.shared-card-view) { height: auto; min-height: 100vh; }
@@ -257,8 +263,9 @@
       width: 100%; max-width: 100%; height: auto; border-radius: 6px;
       box-shadow: 0 12px 36px rgba(0,0,0,0.5);
     }
+    .shared-card-actions { flex-direction: column; margin-top: 20px; }
     .shared-card-download {
-      display: inline-flex; width: 100%; min-height: 48px; margin-top: 20px;
+      width: 100%; min-height: 48px;
       align-items: center; justify-content: center; font-weight: 600;
     }
     header { padding: 10px 12px; gap: 8px; flex-wrap: wrap; }
@@ -450,7 +457,11 @@
     <h1 id="shared-card-title">共有された名刺</h1>
     <p>共有リンクを受け取った人だけが表示できるページです。</p>
     <img class="shared-card-image" id="shared-card-image" alt="共有された名刺">
-    <a class="shared-card-download" id="shared-card-download" download="namecard.png">画像を保存</a>
+    <div class="shared-card-actions">
+      <a class="shared-card-download" id="shared-card-download" download="namecard.png">PNG画像を保存</a>
+      <button type="button" class="shared-card-download shared-card-photo-save" onclick="saveSharedCardToPhotos()">写真フォルダに保存</button>
+    </div>
+    <p class="shared-card-save-hint" id="shared-card-save-status" aria-live="polite">スマホでは共有メニューから「画像を保存」を選択してください。</p>
   </div>
 </section>
 
@@ -2808,6 +2819,26 @@ function openSharedCardFromLink() {
   document.getElementById('shared-card-download').href = imageDataUrl;
   document.title = '共有された名刺';
   return true;
+}
+
+async function saveSharedCardToPhotos() {
+  const imageDataUrl = document.getElementById('shared-card-image').src;
+  const status = document.getElementById('shared-card-save-status');
+  const blob = await (await fetch(imageDataUrl)).blob();
+  const file = new File([blob], 'namecard.png', { type: 'image/png' });
+
+  if (navigator.share && navigator.canShare?.({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], title: '名刺画像' });
+      status.textContent = '共有メニューから写真フォルダへ保存できます。';
+      return;
+    } catch (error) {
+      if (error.name === 'AbortError') return;
+    }
+  }
+
+  document.getElementById('shared-card-download').click();
+  status.textContent = 'PNG画像を保存しました。写真アプリへ追加してください。';
 }
 
 function openImageExport() {
