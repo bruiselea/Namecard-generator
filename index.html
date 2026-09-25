@@ -447,8 +447,10 @@
     </div>
     <div class="export-actions">
       <button type="button" class="export-cancel" onclick="closeImageExport()">編集に戻る</button>
+      <button type="button" class="export-btn" onclick="saveExportedCardToPhotos()">写真フォルダに保存</button>
       <button type="button" class="export-btn green" onclick="downloadCardImage()">画像を保存（PNG）</button>
     </div>
+    <p class="share-status" id="export-photo-save-status" aria-live="polite"></p>
   </div>
 </div>
 
@@ -2821,9 +2823,7 @@ function openSharedCardFromLink() {
   return true;
 }
 
-async function saveSharedCardToPhotos() {
-  const imageDataUrl = document.getElementById('shared-card-image').src;
-  const status = document.getElementById('shared-card-save-status');
+async function shareCardImageToPhotos(imageDataUrl, status, fallbackDownload) {
   const blob = await (await fetch(imageDataUrl)).blob();
   const file = new File([blob], 'namecard.png', { type: 'image/png' });
 
@@ -2837,8 +2837,25 @@ async function saveSharedCardToPhotos() {
     }
   }
 
-  document.getElementById('shared-card-download').click();
+  fallbackDownload();
   status.textContent = 'PNG画像を保存しました。写真アプリへ追加してください。';
+}
+
+async function saveSharedCardToPhotos() {
+  await shareCardImageToPhotos(
+    document.getElementById('shared-card-image').src,
+    document.getElementById('shared-card-save-status'),
+    () => document.getElementById('shared-card-download').click(),
+  );
+}
+
+async function saveExportedCardToPhotos() {
+  if (!exportedImageDataUrl) exportedImageDataUrl = createCardImageDataUrl();
+  await shareCardImageToPhotos(
+    exportedImageDataUrl,
+    document.getElementById('export-photo-save-status'),
+    downloadCardImage,
+  );
 }
 
 function openImageExport() {
@@ -2847,6 +2864,7 @@ function openImageExport() {
   document.getElementById('export-preview-image').src = exportedImageDataUrl;
   document.getElementById('export-share-link').value = createCardShareLink(exportedImageDataUrl);
   document.getElementById('share-link-status').textContent = '';
+  document.getElementById('export-photo-save-status').textContent = '';
   const modal = document.getElementById('export-modal');
   exportReturnFocus = document.activeElement;
   modal.classList.remove('hidden');
