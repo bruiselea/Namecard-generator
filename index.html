@@ -440,7 +440,7 @@
         <input type="text" id="export-share-link" readonly onclick="this.select()" aria-describedby="share-link-hint share-link-status">
         <button type="button" class="share-copy" onclick="copyShareLink()">リンクをコピー</button>
       </div>
-      <p class="share-hint" id="share-link-hint">このリンクを知っている人だけが、完成した名刺を閲覧できます。</p>
+      <p class="share-hint" id="share-link-hint">画像をURLへ埋め込まない軽量リンクです。このリンクを知っている人だけが名刺を閲覧できます。</p>
       <p class="share-status" id="share-link-status" aria-live="polite"></p>
     </div>
     <div class="export-actions">
@@ -2784,6 +2784,7 @@ function calcNormal(a, b, c) {
 // ============================================================
 const IMAGE_EXPORT_SCALE = 12;
 const SHARE_HASH_PREFIX = '#card=';
+const SHARE_STATE_HASH_PREFIX = '#card-v2=';
 const PNG_DATA_URL_PREFIX = 'data:image/png;base64,';
 let exportedImageDataUrl = '';
 let exportReturnFocus = null;
@@ -2797,10 +2798,79 @@ function createCardImageDataUrl() {
   return imageCanvas.toDataURL('image/png');
 }
 
-function createCardShareLink(imageDataUrl) {
-  const base64 = imageDataUrl.slice(PNG_DATA_URL_PREFIX.length);
-  const payload = base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  return location.href.split(/[?#]/)[0] + SHARE_HASH_PREFIX + payload;
+function base64UrlEncodeBytes(bytes) {
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function base64UrlDecodeBytes(payload) {
+  const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+  const binary = atob(base64 + '='.repeat((4 - base64.length % 4) % 4));
+  return Uint8Array.from(binary, character => character.charCodeAt(0));
+}
+
+async function encodeShareState(state) {
+  const bytes = new TextEncoder().encode(JSON.stringify(state));
+  if (!window.CompressionStream) return 'j' + base64UrlEncodeBytes(bytes);
+  const stream = new Blob([bytes]).stream().pipeThrough(new CompressionStream('gzip'));
+  const compressed = new Uint8Array(await new Response(stream).arrayBuffer());
+  return 'z' + base64UrlEncodeBytes(compressed);
+}
+
+async function decodeShareState(payload) {
+  const format = payload[0];
+  let bytes = base64UrlDecodeBytes(payload.slice(1));
+  if (format === 'z') {
+    if (!window.DecompressionStream) throw new Error('圧縮された共有リンクに対応していません');
+    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+    bytes = new Uint8Array(await new Response(stream).arrayBuffer());
+  } else if (format !== 'j') {
+    throw new Error('共有リンクの形式が正しくありません');
+  }
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+
+function compactShareNumber(value) {
+  return Math.round(Number(value) * 100) / 100;
+}
+
+function createCardShareState() {
+  const width = compactShareNumber(cardW);
+  const height = compactShareNumber(cardH);
+  const baseColor = document.getElementById('base-color').value.toLowerCase();
+  return [
+    2, width === 91 ? 0 : width, height === 55 ? 0 : height,
+    baseColor === '#ffffff' ? '' : baseColor.slice(1),
+    backgroundDesign === 'plain' ? '' : backgroundDesign,
+    selectedFontKey === 'gothic' ? '' : selectedFontKey,
+    elements.find(element => element.role === 'dream')?.text || '',
+    elements
+      .filter(element => element.type === 'text' || element.type === 'qr')
+      .map(element => [
+        element.type === 'qr' ? 1 : 0, element.text,
+        compactShareNumber(element.x), compactShareNumber(element.y),
+        compactShareNumber(element.size), element.bold ? 1 : 0, element.color.replace('#', ''),
+      ]),
+  ];
+}
+
+async function createCardShareLink() {
+  const payload = await encodeShareState(createCardShareState());
+  return location.href.split(/[?#]/)[0] + SHARE_STATE_HASH_PREFIX + payload;
+}
+
+async function sharedCardStateFromHash() {
+  if (!location.hash.startsWith(SHARE_STATE_HASH_PREFIX)) return null;
+  const payload = location.hash.slice(SHARE_STATE_HASH_PREFIX.length);
+  if (!payload || payload.length > 50000 || !/^[A-Za-z0-9_-]+$/.test(payload)) return null;
+  try {
+    const state = await decodeShareState(payload);
+    if (!Array.isArray(state) || state[0] !== 2 || !Array.isArray(state[7]) || state[7].length > 20) return null;
+    return state;
+  } catch (error) {
+    return null;
+  }
 }
 
 function sharedCardDataUrlFromHash() {
@@ -2811,8 +2881,24 @@ function sharedCardDataUrlFromHash() {
   return PNG_DATA_URL_PREFIX + base64 + '='.repeat((4 - base64.length % 4) % 4);
 }
 
-function openSharedCardFromLink() {
-  const imageDataUrl = sharedCardDataUrlFromHash();
+async function openSharedCardFromLink() {
+  const state = await sharedCardStateFromHash();
+  let imageDataUrl = sharedCardDataUrlFromHash();
+  if (state) {
+    cardW = Math.min(200, Math.max(10, Number(state[1]) || 91));
+    cardH = Math.min(200, Math.max(10, Number(state[2]) || 55));
+    backgroundDesign = BACKGROUND_DESIGNS[state[4]] ? state[4] : 'plain';
+    selectedFontKey = FONT_OPTIONS[state[5]] ? state[5] : 'gothic';
+    document.getElementById('base-color').value = /^[0-9a-f]{6}$/i.test(state[3] || '') ? `#${state[3]}` : '#ffffff';
+    elements = state[7].filter(Array.isArray).map(item => ({
+      id: uid(), type: item[0] === 1 ? 'qr' : 'text', text: String(item[1] || '').slice(0, 1000),
+      x: Number(item[2]) || 0, y: Number(item[3]) || 0,
+      size: Math.min(100, Math.max(1, Number(item[4]) || 6)), bold: item[5] === 1,
+      color: /^[0-9a-f]{6}$/i.test(item[6] || '') ? `#${item[6]}` : '#111111', extrude: 0.3,
+    }));
+    if (state[6]) elements.push(createDreamIllustrationElement(String(state[6]).slice(0, 1000)));
+    imageDataUrl = createCardImageDataUrl();
+  }
   if (!imageDataUrl) return false;
   document.body.classList.add('shared-card-view');
   document.getElementById('shared-card-image').src = imageDataUrl;
@@ -2856,12 +2942,13 @@ async function saveExportedCardToPhotos() {
   );
 }
 
-function openImageExport() {
+async function openImageExport() {
   if (!validateRequiredProfile()) return;
   exportedImageDataUrl = createCardImageDataUrl();
   document.getElementById('export-preview-image').src = exportedImageDataUrl;
-  document.getElementById('export-share-link').value = createCardShareLink(exportedImageDataUrl);
-  document.getElementById('share-link-status').textContent = '';
+  const shareLink = await createCardShareLink();
+  document.getElementById('export-share-link').value = shareLink;
+  document.getElementById('share-link-status').textContent = `軽量リンクを作成しました（${shareLink.length}文字）。`;
   document.getElementById('export-photo-save-status').textContent = '';
   const modal = document.getElementById('export-modal');
   exportReturnFocus = document.activeElement;
@@ -3099,12 +3186,13 @@ syncBackgroundDesignButtons();
 renderElementList();
 renderCanvas(true); // 初回は中央に配置
 window.addEventListener('resize', () => centerView());
-const isSharedCardView = openSharedCardFromLink();
-if (!isSharedCardView) {
-  restoreTemporaryDraft({ automatic: true });
-  autoSaveEnabled = true;
-  scheduleAutoSave();
-}
+openSharedCardFromLink().then(isSharedCardView => {
+  if (!isSharedCardView) {
+    restoreTemporaryDraft({ automatic: true });
+    autoSaveEnabled = true;
+    scheduleAutoSave();
+  }
+});
 </script>
 </body>
 </html>
