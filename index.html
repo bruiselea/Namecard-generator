@@ -440,7 +440,7 @@
         <input type="text" id="export-share-link" readonly onclick="this.select()" aria-describedby="share-link-hint share-link-status">
         <button type="button" class="share-copy" onclick="copyShareLink()">リンクをコピー</button>
       </div>
-      <p class="share-hint" id="share-link-hint">画像をURLへ埋め込まない軽量リンクです。このリンクを知っている人だけが名刺を閲覧できます。</p>
+      <p class="share-hint" id="share-link-hint">名刺データを保存し、短いIDで開くリンクです。このリンクを知っている人だけが名刺を閲覧できます。</p>
       <p class="share-status" id="share-link-status" aria-live="polite"></p>
     </div>
     <div class="export-actions">
@@ -2785,6 +2785,10 @@ function calcNormal(a, b, c) {
 const IMAGE_EXPORT_SCALE = 12;
 const SHARE_HASH_PREFIX = '#card=';
 const SHARE_STATE_HASH_PREFIX = '#card-v2=';
+const CARD_ID_PATH_PATTERN = /^\/card\/([A-Za-z0-9_-]{12})\/?$/;
+const CARD_STORAGE_ORIGIN = ['localhost', '127.0.0.1'].includes(location.hostname)
+  ? location.origin
+  : 'https://namecard-generator.pages.dev';
 const PNG_DATA_URL_PREFIX = 'data:image/png;base64,';
 let exportedImageDataUrl = '';
 let exportReturnFocus = null;
@@ -2857,7 +2861,42 @@ function createCardShareState() {
 
 async function createCardShareLink() {
   const payload = await encodeShareState(createCardShareState());
-  return location.href.split(/[?#]/)[0] + SHARE_STATE_HASH_PREFIX + payload;
+  try {
+    const response = await fetch(`${CARD_STORAGE_ORIGIN}/api/cards`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ payload }),
+    });
+    if (!response.ok) throw new Error(`保存に失敗しました（${response.status}）`);
+    const { id } = await response.json();
+    if (!/^[A-Za-z0-9_-]{12}$/.test(id || '')) throw new Error('保存先から不正なIDが返されました');
+    return { url: `${CARD_STORAGE_ORIGIN}/card/${id}`, stored: true };
+  } catch (error) {
+    console.warn('短縮リンクを作成できなかったため、軽量リンクを使用します。', error);
+    return {
+      url: location.href.split(/[?#]/)[0] + SHARE_STATE_HASH_PREFIX + payload,
+      stored: false,
+    };
+  }
+}
+
+function isValidSharedCardState(state) {
+  return Array.isArray(state) && state[0] === 2 && Array.isArray(state[7]) && state[7].length <= 20;
+}
+
+async function sharedCardStateFromId() {
+  const id = location.pathname.match(CARD_ID_PATH_PATTERN)?.[1];
+  if (!id) return null;
+  try {
+    const response = await fetch(`${CARD_STORAGE_ORIGIN}/api/cards?id=${encodeURIComponent(id)}`);
+    if (!response.ok) return null;
+    const payload = await response.text();
+    if (!payload || payload.length > 50000 || !/^[jz][A-Za-z0-9_-]+$/.test(payload)) return null;
+    const state = await decodeShareState(payload);
+    return isValidSharedCardState(state) ? state : null;
+  } catch (error) {
+    return null;
+  }
 }
 
 async function sharedCardStateFromHash() {
@@ -2866,8 +2905,7 @@ async function sharedCardStateFromHash() {
   if (!payload || payload.length > 50000 || !/^[A-Za-z0-9_-]+$/.test(payload)) return null;
   try {
     const state = await decodeShareState(payload);
-    if (!Array.isArray(state) || state[0] !== 2 || !Array.isArray(state[7]) || state[7].length > 20) return null;
-    return state;
+    return isValidSharedCardState(state) ? state : null;
   } catch (error) {
     return null;
   }
@@ -2882,7 +2920,7 @@ function sharedCardDataUrlFromHash() {
 }
 
 async function openSharedCardFromLink() {
-  const state = await sharedCardStateFromHash();
+  const state = await sharedCardStateFromId() || await sharedCardStateFromHash();
   let imageDataUrl = sharedCardDataUrlFromHash();
   if (state) {
     cardW = Math.min(200, Math.max(10, Number(state[1]) || 91));
@@ -2947,8 +2985,10 @@ async function openImageExport() {
   exportedImageDataUrl = createCardImageDataUrl();
   document.getElementById('export-preview-image').src = exportedImageDataUrl;
   const shareLink = await createCardShareLink();
-  document.getElementById('export-share-link').value = shareLink;
-  document.getElementById('share-link-status').textContent = `軽量リンクを作成しました（${shareLink.length}文字）。`;
+  document.getElementById('export-share-link').value = shareLink.url;
+  document.getElementById('share-link-status').textContent = shareLink.stored
+    ? `短い共有リンクを作成しました（${shareLink.url.length}文字）。`
+    : `保存先へ接続できなかったため、軽量リンクを作成しました（${shareLink.url.length}文字）。`;
   document.getElementById('export-photo-save-status').textContent = '';
   const modal = document.getElementById('export-modal');
   exportReturnFocus = document.activeElement;
